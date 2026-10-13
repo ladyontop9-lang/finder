@@ -76,6 +76,9 @@ public final class StorageRenderer {
         PoseStack matrices = context.matrices();
         Vec3 camera = context.worldState().cameraRenderState.pos;
 
+        boolean tracers = StorageFinderConfig.tracers && mc.player != null;
+        Vec3 look = tracers ? mc.player.getViewVector(mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) : null;
+
         matrices.pushPose();
         matrices.translate(-camera.x, -camera.y, -camera.z);
 
@@ -87,6 +90,10 @@ public final class StorageRenderer {
                     p.getX() - GROW, p.getY() - GROW, p.getZ() - GROW,
                     p.getX() + 1 + GROW, p.getY() + 1 + GROW, p.getZ() + 1 + GROW,
                     c[0], c[1], c[2], ALPHA);
+            if (tracers) {
+                renderTracer(matrices.last().pose(), buffer, camera, look,
+                        p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, c[0], c[1], c[2], 0.9f);
+            }
         }
 
         if (showPlayers) {
@@ -103,6 +110,10 @@ public final class StorageRenderer {
                         (float) (x - hw), (float) y, (float) (z - hw),
                         (float) (x + hw), (float) (y + h), (float) (z + hw),
                         0.24f, 0.84f, 1.0f, 0.5f);
+                if (tracers) {
+                    renderTracer(matrices.last().pose(), buffer, camera, look,
+                            x, y + h / 2.0, z, 0.24f, 0.84f, 1.0f, 0.9f);
+                }
             }
         }
 
@@ -111,6 +122,38 @@ public final class StorageRenderer {
         if (buffer != null) {
             drawFilledThroughWalls(mc, FILLED_THROUGH_WALLS);
         }
+    }
+
+    /** Cienka linia (billboard) od celownika do celu. Grubość rośnie z dystansem, więc na ekranie ma stałą szerokość. */
+    private static void renderTracer(Matrix4fc m, BufferBuilder b, Vec3 cam, Vec3 look,
+                                     double tx, double ty, double tz,
+                                     float r, float g, float bl, float a) {
+        double ax = cam.x + look.x * 0.8, ay = cam.y + look.y * 0.8, az = cam.z + look.z * 0.8;
+        double dx = tx - ax, dy = ty - ay, dz = tz - az;
+
+        double vx = (ax + tx) / 2 - cam.x, vy = (ay + ty) / 2 - cam.y, vz = (az + tz) / 2 - cam.z;
+        double px = dy * vz - dz * vy, py = dz * vx - dx * vz, pz = dx * vy - dy * vx;
+        double len = Math.sqrt(px * px + py * py + pz * pz);
+        if (len < 1e-6) return;
+        px /= len; py /= len; pz /= len;
+
+        double dEnd = Math.sqrt((tx - cam.x) * (tx - cam.x) + (ty - cam.y) * (ty - cam.y) + (tz - cam.z) * (tz - cam.z));
+        double wA = 0.0008, wB = dEnd * 0.0010;
+
+        float a1x = (float) (ax + px * wA), a1y = (float) (ay + py * wA), a1z = (float) (az + pz * wA);
+        float a2x = (float) (ax - px * wA), a2y = (float) (ay - py * wA), a2z = (float) (az - pz * wA);
+        float b1x = (float) (tx + px * wB), b1y = (float) (ty + py * wB), b1z = (float) (tz + pz * wB);
+        float b2x = (float) (tx - px * wB), b2y = (float) (ty - py * wB), b2z = (float) (tz - pz * wB);
+
+        b.addVertex(m, a1x, a1y, a1z).setColor(r, g, bl, a);
+        b.addVertex(m, a2x, a2y, a2z).setColor(r, g, bl, a);
+        b.addVertex(m, b2x, b2y, b2z).setColor(r, g, bl, a);
+        b.addVertex(m, b1x, b1y, b1z).setColor(r, g, bl, a);
+
+        b.addVertex(m, b1x, b1y, b1z).setColor(r, g, bl, a);
+        b.addVertex(m, b2x, b2y, b2z).setColor(r, g, bl, a);
+        b.addVertex(m, a2x, a2y, a2z).setColor(r, g, bl, a);
+        b.addVertex(m, a1x, a1y, a1z).setColor(r, g, bl, a);
     }
 
     private static void ensureBuffer() {

@@ -12,6 +12,7 @@ public final class StorageFinderConfig {
     public static boolean enabled = false;
     public static final boolean[] types = new boolean[StorageType.values().length];
     public static boolean players = false;
+    public static boolean tracers = false;
     public static int radiusChunks = 8;
 
     static {
@@ -45,6 +46,7 @@ public final class StorageFinderConfig {
                 types[t.ordinal()] = Boolean.parseBoolean(p.getProperty("type." + t.name(), "true"));
             }
             players = Boolean.parseBoolean(p.getProperty("players", "false"));
+            tracers = Boolean.parseBoolean(p.getProperty("tracers", "false"));
             radiusChunks = Math.max(2, Math.min(16, Integer.parseInt(p.getProperty("radius", "8"))));
         } catch (Exception ignored) {
         }
@@ -58,6 +60,7 @@ public final class StorageFinderConfig {
                 p.setProperty("type." + t.name(), Boolean.toString(types[t.ordinal()]));
             }
             p.setProperty("players", Boolean.toString(players));
+            p.setProperty("tracers", Boolean.toString(tracers));
             p.setProperty("radius", Integer.toString(radiusChunks));
             try (OutputStream out = Files.newOutputStream(file())) {
                 p.store(out, "Storage Finder");

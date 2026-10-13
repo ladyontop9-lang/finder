@@ -30,9 +30,10 @@ public class StorageSettingsScreen extends Screen {
     private int playersY() { return gridEnd() + 22; }
     private int sliderX() { return px() + 16; }
     private int sliderW() { return PW - 32; }
-    private int sliderY() { return playersY() + 24 + 30; }
+    private int tracersY() { return playersY() + 26; }
+    private int sliderY() { return tracersY() + 24 + 30; }
     private int doneY() { return sliderY() + 20; }
-    private int ph() { return 58 + rows() * ROW_H + 22 + 24 + 30 + 20 + 22 + 14; }
+    private int ph() { return 58 + rows() * ROW_H + 22 + 26 + 24 + 30 + 20 + 22 + 14; }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
@@ -64,7 +65,7 @@ public class StorageSettingsScreen extends Screen {
             Ui.toggle(g, cx + COL_W - 40, cy + 4, on);
         }
 
-        Ui.text(g, this.font, "ENTITIES", x + 16, gridEnd() + 8, Ui.MUTED);
+        Ui.text(g, this.font, "EXTRAS", x + 16, gridEnd() + 8, Ui.MUTED);
 
         int py = playersY();
         int rx = x + 12, rw = PW - 24;
@@ -78,6 +79,16 @@ public class StorageSettingsScreen extends Screen {
         String pc = (StorageFinderConfig.enabled && pOn) ? String.valueOf(StorageScanner.playerCount()) : "-";
         Ui.textRight(g, this.font, pc, rx + rw - 52, py + 8, Ui.MUTED);
         Ui.toggle(g, rx + rw - 44, py + 4, pOn);
+
+        int ty = tracersY();
+        boolean tHover = Ui.hit(mouseX, mouseY, rx, ty, rw, 24);
+        boolean tOn = StorageFinderConfig.tracers;
+        Ui.rrect(g, rx, ty, rw, 24, 5, tHover ? Ui.CARD_HOVER : Ui.CARD);
+        Ui.rrect(g, rx + 8, ty + 7, 10, 10, 3, tOn ? Ui.ACCENT : Ui.OFF);
+        Ui.text(g, this.font, "Tracers", rx + 24, ty + 8, tOn ? Ui.TEXT : Ui.MUTED);
+        Ui.text(g, this.font, "Lines from your crosshair to every highlight",
+                rx + 24 + this.font.width("Tracers") + 10, ty + 8, Ui.MUTED);
+        Ui.toggle(g, rx + rw - 44, ty + 4, tOn);
 
         int sy = sliderY();
         Ui.text(g, this.font, "Scan range", x + 16, sy - 16, Ui.TEXT);
@@ -127,6 +138,12 @@ public class StorageSettingsScreen extends Screen {
 
             if (Ui.hit(mx, my, x + 12, playersY(), PW - 24, 24)) {
                 StorageFinderConfig.players = !StorageFinderConfig.players;
+                StorageFinderConfig.save();
+                return true;
+            }
+
+            if (Ui.hit(mx, my, x + 12, tracersY(), PW - 24, 24)) {
+                StorageFinderConfig.tracers = !StorageFinderConfig.tracers;
                 StorageFinderConfig.save();
                 return true;
             }
