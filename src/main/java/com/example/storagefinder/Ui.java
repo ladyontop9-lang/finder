@@ -16,6 +16,7 @@ final class Ui {
     static final int ON = 0xFF3DD68C;
     static final int OFF = 0xFF3A4152;
     static final int WHITE = 0xFFFFFFFF;
+    static final int PLAYER = 0xFF3DD6FF;
 
     private Ui() {}
 

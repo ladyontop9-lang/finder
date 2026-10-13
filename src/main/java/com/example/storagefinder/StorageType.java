@@ -5,6 +5,9 @@ public enum StorageType {
     ENDER_CHEST("Ender chests", 0x6C5CFF),
     SHULKER("Shulker boxes", 0xFF4FD8),
     BARREL("Barrels", 0xC8955A),
+    HOPPER("Hoppers", 0x9AA5B1),
+    PISTON("Pistons", 0xF4D03F),
+    STICKY_PISTON("Sticky pistons", 0x58D68D),
     AMETHYST("Amethyst clusters", 0xC9A0FF);
 
     public final String label;

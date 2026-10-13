@@ -26,6 +26,7 @@ import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.Vec3;
 
@@ -67,10 +68,11 @@ public final class StorageRenderer {
     private static void onRender(WorldRenderContext context) {
         if (!StorageFinderConfig.enabled) return;
 
-        java.util.List<StorageScanner.Entry> entries = StorageScanner.found();
-        if (entries.isEmpty()) return;
-
         Minecraft mc = Minecraft.getInstance();
+        java.util.List<StorageScanner.Entry> entries = StorageScanner.found();
+        boolean showPlayers = StorageFinderConfig.players && mc.level != null && mc.player != null;
+        if (entries.isEmpty() && !showPlayers) return;
+
         PoseStack matrices = context.matrices();
         Vec3 camera = context.worldState().cameraRenderState.pos;
 
@@ -78,12 +80,7 @@ public final class StorageRenderer {
         matrices.translate(-camera.x, -camera.y, -camera.z);
 
         for (StorageScanner.Entry e : entries) {
-            if (buffer == null) {
-                buffer = new BufferBuilder(ALLOCATOR,
-                        FILLED_THROUGH_WALLS.getVertexFormatMode(),
-                        FILLED_THROUGH_WALLS.getVertexFormat());
-            }
-
+            ensureBuffer();
             BlockPos p = e.pos();
             float[] c = e.type().rgbFloats();
             renderFilledBox(matrices.last().pose(), buffer,
@@ -92,10 +89,35 @@ public final class StorageRenderer {
                     c[0], c[1], c[2], ALPHA);
         }
 
+        if (showPlayers) {
+            float pt = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+            for (var other : mc.level.players()) {
+                if (other == mc.player) continue;
+                double x = Mth.lerp(pt, other.xo, other.getX());
+                double y = Mth.lerp(pt, other.yo, other.getY());
+                double z = Mth.lerp(pt, other.zo, other.getZ());
+                float hw = other.getBbWidth() / 2f;
+                float h = other.getBbHeight();
+                ensureBuffer();
+                renderFilledBox(matrices.last().pose(), buffer,
+                        (float) (x - hw), (float) y, (float) (z - hw),
+                        (float) (x + hw), (float) (y + h), (float) (z + hw),
+                        0.24f, 0.84f, 1.0f, 0.5f);
+            }
+        }
+
         matrices.popPose();
 
         if (buffer != null) {
             drawFilledThroughWalls(mc, FILLED_THROUGH_WALLS);
+        }
+    }
+
+    private static void ensureBuffer() {
+        if (buffer == null) {
+            buffer = new BufferBuilder(ALLOCATOR,
+                    FILLED_THROUGH_WALLS.getVertexFormatMode(),
+                    FILLED_THROUGH_WALLS.getVertexFormat());
         }
     }
 
