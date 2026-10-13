@@ -22,20 +22,11 @@ import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
-import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
-import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.phys.Vec3;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -76,41 +67,29 @@ public final class StorageRenderer {
     private static void onRender(WorldRenderContext context) {
         if (!StorageFinderConfig.enabled) return;
 
-        Minecraft mc = Minecraft.getInstance();
-        ClientLevel level = mc.level;
-        Player player = mc.player;
-        if (level == null || player == null) return;
+        java.util.List<StorageScanner.Entry> entries = StorageScanner.found();
+        if (entries.isEmpty()) return;
 
+        Minecraft mc = Minecraft.getInstance();
         PoseStack matrices = context.matrices();
         Vec3 camera = context.worldState().cameraRenderState.pos;
 
         matrices.pushPose();
         matrices.translate(-camera.x, -camera.y, -camera.z);
 
-        ChunkPos center = player.chunkPosition();
-        int r = Math.min(StorageFinderConfig.radiusChunks, mc.options.renderDistance().get());
-
-        for (int cx = center.x - r; cx <= center.x + r; cx++) {
-            for (int cz = center.z - r; cz <= center.z + r; cz++) {
-                if (!(level.getChunk(cx, cz, ChunkStatus.FULL, false) instanceof LevelChunk chunk)) continue;
-
-                for (BlockEntity be : chunk.getBlockEntities().values()) {
-                    float[] c = color(be);
-                    if (c == null) continue;
-
-                    if (buffer == null) {
-                        buffer = new BufferBuilder(ALLOCATOR,
-                                FILLED_THROUGH_WALLS.getVertexFormatMode(),
-                                FILLED_THROUGH_WALLS.getVertexFormat());
-                    }
-
-                    BlockPos p = be.getBlockPos();
-                    renderFilledBox(matrices.last().pose(), buffer,
-                            p.getX() - GROW, p.getY() - GROW, p.getZ() - GROW,
-                            p.getX() + 1 + GROW, p.getY() + 1 + GROW, p.getZ() + 1 + GROW,
-                            c[0], c[1], c[2], ALPHA);
-                }
+        for (StorageScanner.Entry e : entries) {
+            if (buffer == null) {
+                buffer = new BufferBuilder(ALLOCATOR,
+                        FILLED_THROUGH_WALLS.getVertexFormatMode(),
+                        FILLED_THROUGH_WALLS.getVertexFormat());
             }
+
+            BlockPos p = e.pos();
+            float[] c = e.type().rgbFloats();
+            renderFilledBox(matrices.last().pose(), buffer,
+                    p.getX() - GROW, p.getY() - GROW, p.getZ() - GROW,
+                    p.getX() + 1 + GROW, p.getY() + 1 + GROW, p.getZ() + 1 + GROW,
+                    c[0], c[1], c[2], ALPHA);
         }
 
         matrices.popPose();
@@ -118,14 +97,6 @@ public final class StorageRenderer {
         if (buffer != null) {
             drawFilledThroughWalls(mc, FILLED_THROUGH_WALLS);
         }
-    }
-
-    /** Kolor RGB albo null, jeśli ten typ jest wyłączony / to nie magazyn. */
-    private static float[] color(BlockEntity be) {
-        if (be instanceof ShulkerBoxBlockEntity && StorageFinderConfig.shulkers) return new float[]{1f, 0.2f, 1f};
-        if (be instanceof EnderChestBlockEntity && StorageFinderConfig.enderChests) return new float[]{0.6f, 0.2f, 1f};
-        if (be instanceof ChestBlockEntity && StorageFinderConfig.chests) return new float[]{1f, 0.6f, 0.1f};
-        return null;
     }
 
     private static void renderFilledBox(Matrix4fc m, BufferBuilder b, float minX, float minY, float minZ,

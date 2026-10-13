@@ -1,51 +1,73 @@
 package com.example.storagefinder;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
+/** Główne menu: lista modułów. LPM = włącz/wyłącz, PPM = ustawienia. */
 public class StorageFinderScreen extends Screen {
+    private static final int PW = 320, PH = 168;
 
     public StorageFinderScreen() {
         super(Component.literal("Storage Finder"));
     }
 
-    private static Component label(String name, boolean on) {
-        return Component.literal(name + ": " + (on ? "§aON" : "§cOFF"));
+    private int px() { return (this.width - PW) / 2; }
+    private int py() { return Math.max(4, (this.height - PH) / 2); }
+
+    private int cardX() { return px() + 12; }
+    private int cardY() { return py() + 58; }
+    private static final int CARD_W = PW - 24, CARD_H = 56;
+
+    @Override
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        super.render(g, mouseX, mouseY, partialTick);
+
+        int x = px(), y = py();
+        Ui.panel(g, x, y, PW, PH);
+
+        Ui.text(g, this.font, "Storage Finder", x + 16, y + 14, Ui.TEXT);
+        Ui.text(g, this.font, "Highlights storages through walls", x + 16, y + 28, Ui.MUTED);
+
+        int cx = cardX(), cy = cardY();
+        boolean hover = Ui.hit(mouseX, mouseY, cx, cy, CARD_W, CARD_H);
+        Ui.rrect(g, cx, cy, CARD_W, CARD_H, 6, hover ? Ui.CARD_HOVER : Ui.CARD);
+
+        Ui.rrect(g, cx + 10, cy + 12, 32, 32, 6, StorageFinderConfig.enabled ? Ui.ACCENT : Ui.OFF);
+        Ui.textCenter(g, this.font, "S", cx + 26, cy + 24, Ui.WHITE);
+
+        Ui.text(g, this.font, "Storage Finder", cx + 52, cy + 14, Ui.TEXT);
+        Ui.text(g, this.font, "Right-click for settings", cx + 52, cy + 29, Ui.MUTED);
+
+        Ui.toggle(g, cx + CARD_W - 46, cy + CARD_H / 2 - 8, StorageFinderConfig.enabled);
+
+        Ui.textCenter(g, this.font, "Left-click: toggle   Right-click: settings", x + PW / 2, y + PH - 28, Ui.MUTED);
+        Ui.textCenter(g, this.font, "Press ESC to close", x + PW / 2, y + PH - 16, Ui.OFF);
     }
 
     @Override
-    protected void init() {
-        int w = 160, h = 20, x = this.width / 2 - w / 2, y = this.height / 2 - 50;
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mx = event.x(), my = event.y();
+        int btn = event.button();
 
-        addRenderableWidget(Button.builder(label("Storage Finder", StorageFinderConfig.enabled), b -> {
-            StorageFinderConfig.enabled = !StorageFinderConfig.enabled;
-            b.setMessage(label("Storage Finder", StorageFinderConfig.enabled));
-        }).bounds(x, y, w, h).build());
-
-        addRenderableWidget(Button.builder(label("Chesty", StorageFinderConfig.chests), b -> {
-            StorageFinderConfig.chests = !StorageFinderConfig.chests;
-            b.setMessage(label("Chesty", StorageFinderConfig.chests));
-        }).bounds(x, y + 28, w, h).build());
-
-        addRenderableWidget(Button.builder(label("Ender Chesty", StorageFinderConfig.enderChests), b -> {
-            StorageFinderConfig.enderChests = !StorageFinderConfig.enderChests;
-            b.setMessage(label("Ender Chesty", StorageFinderConfig.enderChests));
-        }).bounds(x, y + 52, w, h).build());
-
-        addRenderableWidget(Button.builder(label("Shulker Boxy", StorageFinderConfig.shulkers), b -> {
-            StorageFinderConfig.shulkers = !StorageFinderConfig.shulkers;
-            b.setMessage(label("Shulker Boxy", StorageFinderConfig.shulkers));
-        }).bounds(x, y + 76, w, h).build());
-
-        addRenderableWidget(Button.builder(Component.literal("Zamknij"), b -> onClose())
-                .bounds(x, y + 108, w, h).build());
+        if (Ui.hit(mx, my, cardX(), cardY(), CARD_W, CARD_H)) {
+            if (btn == 0) {
+                StorageFinderConfig.enabled = !StorageFinderConfig.enabled;
+                StorageFinderConfig.save();
+                return true;
+            }
+            if (btn == 1) {
+                this.minecraft.setScreen(new StorageSettingsScreen(this));
+                return true;
+            }
+        }
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, this.height / 2 - 75, 0xFFFFFFFF);
+    public void onClose() {
+        StorageFinderConfig.save();
+        super.onClose();
     }
 }

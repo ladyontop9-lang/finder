@@ -12,6 +12,7 @@ public class StorageFinderMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        StorageFinderConfig.load();
         KeyMapping.Category category = KeyMapping.Category.register(
                 Identifier.fromNamespaceAndPath("storagefinder", "main"));
 
@@ -28,6 +29,8 @@ public class StorageFinderMod implements ClientModInitializer {
                 }
             }
         });
+
+        ClientTickEvents.END_CLIENT_TICK.register(StorageScanner::tick);
 
         StorageRenderer.init();
     }
