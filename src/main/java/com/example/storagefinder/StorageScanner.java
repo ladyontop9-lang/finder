@@ -19,27 +19,42 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
+import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
-/** Skanuje załadowane chunki co pół sekundy i zapamiętuje znalezione bloki. */
+/**
+ * Skanuje załadowane chunki.
+ * Block entity (skrzynie, hoppery, spawnery...) co 2 ticki, bloki szukane po stanie (pistony, ametyst) co 10 ticków.
+ * Każda zmiana ustawień wymusza natychmiastowe skanowanie.
+ */
 public final class StorageScanner {
     public record Entry(BlockPos pos, StorageType type) {}
 
+    private static final int N = StorageType.values().length;
+
     private static volatile List<Entry> found = List.of();
-    private static final int[] counts = new int[StorageType.values().length];
+    private static List<Entry> beEntries = List.of();
+    private static List<Entry> blockEntries = List.of();
+    private static int[] beCounts = new int[N];
+    private static int[] blockCounts = new int[N];
     private static volatile int playerCount = 0;
     private static int tickCounter = 0;
+    private static volatile boolean rescan = true;
 
     private StorageScanner() {}
+
+    public static void requestRescan() {
+        rescan = true;
+    }
 
     public static List<Entry> found() {
         return found;
     }
 
     public static int count(StorageType t) {
-        return counts[t.ordinal()];
+        return beCounts[t.ordinal()] + blockCounts[t.ordinal()];
     }
 
     public static int playerCount() {
@@ -50,20 +65,32 @@ public final class StorageScanner {
         if (!StorageFinderConfig.enabled) {
             if (!found.isEmpty()) {
                 found = List.of();
-                Arrays.fill(counts, 0);
+                beEntries = List.of();
+                blockEntries = List.of();
+                beCounts = new int[N];
+                blockCounts = new int[N];
             }
             playerCount = 0;
+            rescan = true;
             return;
         }
         ClientLevel level = mc.level;
         Player player = mc.player;
         if (level == null || player == null) return;
-        if (tickCounter++ % 10 != 0) return;
 
-        playerCount = Math.max(0, level.players().size() - 1);
+        boolean force = rescan;
+        boolean doBe = force || tickCounter % 2 == 0;
+        boolean doBlocks = force || tickCounter % 10 == 0;
+        tickCounter++;
+        rescan = false;
+        if (!doBe && !doBlocks) return;
 
-        List<Entry> list = new ArrayList<>();
-        int[] newCounts = new int[counts.length];
+        if (doBe) playerCount = Math.max(0, level.players().size() - 1);
+
+        List<Entry> newBe = new ArrayList<>();
+        List<Entry> newBlocks = new ArrayList<>();
+        int[] newBeCounts = new int[N];
+        int[] newBlockCounts = new int[N];
 
         Map<Block, StorageType> blockTypes = new HashMap<>();
         for (StorageType t : StorageType.values()) {
@@ -79,21 +106,34 @@ public final class StorageScanner {
             for (int cz = center.z - r; cz <= center.z + r; cz++) {
                 if (!(level.getChunk(cx, cz, ChunkStatus.FULL, false) instanceof LevelChunk chunk)) continue;
 
-                for (BlockEntity be : chunk.getBlockEntities().values()) {
-                    StorageType t = typeOf(be);
-                    if (t == null || !StorageFinderConfig.isOn(t)) continue;
-                    list.add(new Entry(be.getBlockPos(), t));
-                    newCounts[t.ordinal()]++;
+                if (doBe) {
+                    for (BlockEntity be : chunk.getBlockEntities().values()) {
+                        StorageType t = typeOf(be);
+                        if (t == null || !StorageFinderConfig.isOn(t)) continue;
+                        newBe.add(new Entry(be.getBlockPos(), t));
+                        newBeCounts[t.ordinal()]++;
+                    }
                 }
 
-                if (!blockTypes.isEmpty()) {
-                    scanBlocks(chunk, minSection, blockTypes, list, newCounts);
+                if (doBlocks && !blockTypes.isEmpty()) {
+                    scanBlocks(chunk, minSection, blockTypes, newBlocks, newBlockCounts);
                 }
             }
         }
 
-        System.arraycopy(newCounts, 0, counts, 0, counts.length);
-        found = list;
+        if (doBe) {
+            beEntries = newBe;
+            beCounts = newBeCounts;
+        }
+        if (doBlocks) {
+            blockEntries = newBlocks;
+            blockCounts = newBlockCounts;
+        }
+
+        List<Entry> merged = new ArrayList<>(beEntries.size() + blockEntries.size());
+        merged.addAll(beEntries);
+        merged.addAll(blockEntries);
+        found = merged;
     }
 
     private static StorageType typeOf(BlockEntity be) {
@@ -102,6 +142,7 @@ public final class StorageScanner {
         if (be instanceof ChestBlockEntity) return StorageType.CHEST;
         if (be instanceof BarrelBlockEntity) return StorageType.BARREL;
         if (be instanceof HopperBlockEntity) return StorageType.HOPPER;
+        if (be instanceof SpawnerBlockEntity) return StorageType.SPAWNER;
         return null;
     }
 
@@ -116,7 +157,7 @@ public final class StorageScanner {
     }
 
     private static void scanBlocks(LevelChunk chunk, int minSection, Map<Block, StorageType> blockTypes,
-                                   List<Entry> list, int[] newCounts) {
+                                   List<Entry> list, int[] counts) {
         LevelChunkSection[] sections = chunk.getSections();
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
@@ -133,7 +174,7 @@ public final class StorageScanner {
                         StorageType t = blockTypes.get(s.getBlockState(x, y, z).getBlock());
                         if (t != null) {
                             list.add(new Entry(new BlockPos(baseX + x, baseY + y, baseZ + z), t));
-                            newCounts[t.ordinal()]++;
+                            counts[t.ordinal()]++;
                         }
                     }
                 }

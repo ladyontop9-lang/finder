@@ -53,6 +53,7 @@ public final class StorageFinderConfig {
     }
 
     public static void save() {
+        StorageScanner.requestRescan();
         try {
             Properties p = new Properties();
             p.setProperty("enabled", Boolean.toString(enabled));

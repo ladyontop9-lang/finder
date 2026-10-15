@@ -83,8 +83,9 @@ public final class StorageRenderer {
         matrices.translate(-camera.x, -camera.y, -camera.z);
 
         for (StorageScanner.Entry e : entries) {
-            ensureBuffer();
             BlockPos p = e.pos();
+            if (mc.level != null && mc.level.getBlockState(p).isAir()) continue;
+            ensureBuffer();
             float[] c = e.type().rgbFloats();
             renderFilledBox(matrices.last().pose(), buffer,
                     p.getX() - GROW, p.getY() - GROW, p.getZ() - GROW,

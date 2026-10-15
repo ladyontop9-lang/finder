@@ -4,6 +4,7 @@ public enum StorageType {
     CHEST("Chests", 0xFFA21A),
     ENDER_CHEST("Ender chests", 0x6C5CFF),
     SHULKER("Shulker boxes", 0xFF4FD8),
+    SPAWNER("Spawners", 0xFF4D4D),
     BARREL("Barrels", 0xC8955A),
     HOPPER("Hoppers", 0x9AA5B1),
     PISTON("Pistons", 0xF4D03F),
