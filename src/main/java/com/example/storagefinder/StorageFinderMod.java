@@ -25,13 +25,17 @@ public class StorageFinderMod implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openGui.consumeClick()) {
                 if (client.screen == null) {
-                    client.setScreen(new StorageFinderScreen());
+                    client.setScreen(new ClickGuiScreen());
                 }
             }
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(StorageScanner::tick);
 
+        ClientTickEvents.END_CLIENT_TICK.register(Aura::tick);
+
+        Freecam.init();
+        Hud.init();
         StorageRenderer.init();
     }
 }

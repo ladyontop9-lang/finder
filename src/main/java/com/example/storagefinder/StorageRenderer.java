@@ -77,7 +77,11 @@ public final class StorageRenderer {
         Vec3 camera = context.worldState().cameraRenderState.pos;
 
         boolean tracers = StorageFinderConfig.tracers && mc.player != null;
-        Vec3 look = tracers ? mc.player.getViewVector(mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) : null;
+        Vec3 look = null;
+        if (tracers) {
+            var viewer = mc.getCameraEntity() != null ? mc.getCameraEntity() : mc.player;
+            look = viewer.getViewVector(mc.getDeltaTracker().getGameTimeDeltaPartialTick(false));
+        }
 
         matrices.pushPose();
         matrices.translate(-camera.x, -camera.y, -camera.z);

@@ -15,6 +15,11 @@ public final class StorageFinderConfig {
     public static boolean tracers = false;
     public static int radiusChunks = 8;
 
+    public static double freecamSpeed = 3.0;
+    public static double auraRange = 3.5;
+    public static double auraSpeed = 8.0;
+    public static boolean auraPlayersOnly = true;
+
     static {
         java.util.Arrays.fill(types, true);
     }
@@ -23,6 +28,10 @@ public final class StorageFinderConfig {
 
     public static boolean isOn(StorageType t) {
         return types[t.ordinal()];
+    }
+
+    public static void setOn(StorageType t, boolean v) {
+        types[t.ordinal()] = v;
     }
 
     public static void toggle(StorageType t) {
@@ -48,6 +57,10 @@ public final class StorageFinderConfig {
             players = Boolean.parseBoolean(p.getProperty("players", "false"));
             tracers = Boolean.parseBoolean(p.getProperty("tracers", "false"));
             radiusChunks = Math.max(2, Math.min(16, Integer.parseInt(p.getProperty("radius", "8"))));
+            freecamSpeed = Double.parseDouble(p.getProperty("freecamSpeed", "3.0"));
+            auraRange = Double.parseDouble(p.getProperty("auraRange", "3.5"));
+            auraSpeed = Double.parseDouble(p.getProperty("auraSpeed", "8.0"));
+            auraPlayersOnly = Boolean.parseBoolean(p.getProperty("auraPlayersOnly", "true"));
         } catch (Exception ignored) {
         }
     }
@@ -63,6 +76,10 @@ public final class StorageFinderConfig {
             p.setProperty("players", Boolean.toString(players));
             p.setProperty("tracers", Boolean.toString(tracers));
             p.setProperty("radius", Integer.toString(radiusChunks));
+            p.setProperty("freecamSpeed", Double.toString(freecamSpeed));
+            p.setProperty("auraRange", Double.toString(auraRange));
+            p.setProperty("auraSpeed", Double.toString(auraSpeed));
+            p.setProperty("auraPlayersOnly", Boolean.toString(auraPlayersOnly));
             try (OutputStream out = Files.newOutputStream(file())) {
                 p.store(out, "Storage Finder");
             }
