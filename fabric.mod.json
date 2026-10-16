@@ -8,7 +8,6 @@
   "entrypoints": {
     "client": ["com.example.storagefinder.StorageFinderMod"]
   },
-  "mixins": ["storagefinder.mixins.json"],
   "depends": {
     "fabricloader": ">=0.17.0",
     "minecraft": "1.21.11",
