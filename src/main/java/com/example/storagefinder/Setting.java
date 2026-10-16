@@ -4,6 +4,8 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import java.util.function.DoubleSupplier;
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
 
 public abstract class Setting {
     public final String name;
@@ -58,5 +60,20 @@ public abstract class Setting {
             return integer ? String.valueOf((int) Math.round(get()))
                     : String.format(java.util.Locale.ROOT, "%.1f", get());
         }
+    }
+
+    /** Wybór koloru RGB (trzy suwaki + podgląd). */
+    public static final class ColorPick extends Setting {
+        private final IntSupplier getter;
+        private final IntConsumer setter;
+
+        public ColorPick(String name, IntSupplier getter, IntConsumer setter) {
+            super(name);
+            this.getter = getter;
+            this.setter = setter;
+        }
+
+        public int get() { return getter.getAsInt() & 0xFFFFFF; }
+        public void set(int rgb) { setter.accept(rgb & 0xFFFFFF); }
     }
 }

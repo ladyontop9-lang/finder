@@ -7,8 +7,10 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 
-/** Lista włączonych modułów w prawym górnym rogu (jak w projekcie Click GUI). */
+/** ArrayList: lista włączonych modułów w prawym górnym rogu. */
 public final class Hud {
+    private static List<Module> order;
+
     private Hud() {}
 
     public static void init() {
@@ -16,32 +18,41 @@ public final class Hud {
     }
 
     private static void render(GuiGraphics g) {
+        if (!StorageFinderConfig.arrayList) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.options.hideGui || mc.player == null) return;
 
-        List<String> names = new ArrayList<>();
-        for (Module m : Modules.ALL) {
-            if (m.isEnabled()) names.add(m.name);
+        if (order == null) {
+            order = new ArrayList<>();
+            for (Module m : Modules.ALL) {
+                if (m != Modules.ARRAY_LIST) order.add(m);
+            }
+            order.sort((a, b) -> mc.font.width(b.name) - mc.font.width(a.name));
         }
-        names.sort((a, b) -> mc.font.width(b) - mc.font.width(a));
 
+        boolean bg = StorageFinderConfig.alBackground;
+        boolean bar = StorageFinderConfig.alBar;
         int sw = g.guiWidth();
-        int y = 4;
         int lh = mc.font.lineHeight + 3;
+        int y = 4;
+        int rightEdge = sw - 4 - (bar ? 3 : 0);
 
-        String title = "Storage Finder";
-        int tw = mc.font.width(title) + 8;
-        g.fill(sw - 4 - tw - 3, y, sw - 4 - 3, y + lh, 0xB80F0A1C);
-        g.fill(sw - 4 - 3, y, sw - 4, y + lh, 0xFF5E4A96);
-        g.drawString(mc.font, title, sw - 4 - 3 - tw + 4, y + 2, 0xFF9A8FBA);
-        y += lh;
-
-        for (String n : names) {
-            int w = mc.font.width(n) + 8;
-            g.fill(sw - 4 - w - 3, y, sw - 4 - 3, y + lh, 0xB80F0A1C);
-            g.fill(sw - 4 - 3, y, sw - 4, y + lh, 0xFF7DD3C0);
-            g.drawString(mc.font, n, sw - 4 - 3 - w + 4, y + 2, 0xFFEFEAFF);
-            y += lh;
+        if (StorageFinderConfig.alTitle) {
+            y = row(g, mc, "Storage Finder", rightEdge, y, lh, bg, bar, 0xFF5E4A96, 0xFF9A8FBA);
         }
+        for (Module m : order) {
+            if (m.isEnabled()) {
+                y = row(g, mc, m.name, rightEdge, y, lh, bg, bar, 0xFF7DD3C0, 0xFFEFEAFF);
+            }
+        }
+    }
+
+    private static int row(GuiGraphics g, Minecraft mc, String text, int rightEdge, int y, int lh,
+                           boolean bg, boolean bar, int barColor, int textColor) {
+        int w = mc.font.width(text) + 8;
+        if (bg) g.fill(rightEdge - w, y, rightEdge, y + lh, 0xB80F0A1C);
+        if (bar) g.fill(rightEdge, y, rightEdge + 3, y + lh, barColor);
+        g.drawString(mc.font, text, rightEdge - w + 4, y + 2, textColor);
+        return y + lh;
     }
 }

@@ -4,24 +4,54 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.Properties;
 
 import net.fabricmc.loader.api.FabricLoader;
 
 public final class StorageFinderConfig {
+    // ---- Storage Finder ----
     public static boolean enabled = false;
     public static final boolean[] types = new boolean[StorageType.values().length];
-    public static boolean players = false;
-    public static boolean tracers = false;
+    public static boolean tracers = true;          // tracery do bloków
     public static int radiusChunks = 8;
 
+    // ---- ESP ----
+    public static boolean espEnabled = false;
+    public static boolean espPlayers = true;
+    public static boolean espHostile = true;
+    public static boolean espPassive = false;
+    public static int espPlayerColor = 0x3DD6FF;
+    public static int espMobColor = 0xFF5555;
+    public static int espOpacity = 50;             // %
+
+    // ---- Tracers (gracze / moby) ----
+    public static boolean tracersEnabled = false;
+    public static boolean trPlayers = true;
+    public static boolean trHostile = false;
+    public static boolean trPassive = false;
+    public static double tracerThickness = 1.0;
+
+    // ---- ArrayList ----
+    public static boolean arrayList = true;
+    public static boolean alBackground = true;
+    public static boolean alBar = true;
+    public static boolean alTitle = true;
+
+    // ---- Freecam / Aura ----
     public static double freecamSpeed = 3.0;
-    public static double auraRange = 3.5;
+    public static double auraRange = 3.0;
     public static double auraSpeed = 8.0;
     public static boolean auraPlayersOnly = true;
+    public static boolean auraCooldown = true;
+    public static boolean auraWalls = false;
+    public static boolean auraRotate = false;
+
+    private static int lastSig = 0;
 
     static {
-        java.util.Arrays.fill(types, true);
+        Arrays.fill(types, true);
     }
 
     private StorageFinderConfig() {}
@@ -42,6 +72,19 @@ public final class StorageFinderConfig {
         return FabricLoader.getInstance().getConfigDir().resolve("storagefinder.properties");
     }
 
+    private static boolean b(Properties p, String k, boolean d) {
+        String v = p.getProperty(k);
+        return v == null ? d : Boolean.parseBoolean(v);
+    }
+
+    private static double dbl(Properties p, String k, double d) {
+        try { return Double.parseDouble(p.getProperty(k, Double.toString(d))); } catch (Exception e) { return d; }
+    }
+
+    private static int num(Properties p, String k, int d) {
+        try { return Integer.parseInt(p.getProperty(k, Integer.toString(d))); } catch (Exception e) { return d; }
+    }
+
     public static void load() {
         try {
             Path f = file();
@@ -50,36 +93,89 @@ public final class StorageFinderConfig {
             try (InputStream in = Files.newInputStream(f)) {
                 p.load(in);
             }
-            enabled = Boolean.parseBoolean(p.getProperty("enabled", "false"));
+            enabled = b(p, "enabled", false);
             for (StorageType t : StorageType.values()) {
-                types[t.ordinal()] = Boolean.parseBoolean(p.getProperty("type." + t.name(), "true"));
+                types[t.ordinal()] = b(p, "type." + t.name(), true);
             }
-            players = Boolean.parseBoolean(p.getProperty("players", "false"));
-            tracers = Boolean.parseBoolean(p.getProperty("tracers", "false"));
-            radiusChunks = Math.max(2, Math.min(16, Integer.parseInt(p.getProperty("radius", "8"))));
-            freecamSpeed = Double.parseDouble(p.getProperty("freecamSpeed", "3.0"));
-            auraRange = Double.parseDouble(p.getProperty("auraRange", "3.5"));
-            auraSpeed = Double.parseDouble(p.getProperty("auraSpeed", "8.0"));
-            auraPlayersOnly = Boolean.parseBoolean(p.getProperty("auraPlayersOnly", "true"));
+            tracers = b(p, "tracers", true);
+            radiusChunks = Math.max(2, Math.min(16, num(p, "radius", 8)));
+
+            espEnabled = b(p, "espEnabled", false);
+            espPlayers = b(p, "espPlayers", true);
+            espHostile = b(p, "espHostile", true);
+            espPassive = b(p, "espPassive", false);
+            espPlayerColor = num(p, "espPlayerColor", 0x3DD6FF) & 0xFFFFFF;
+            espMobColor = num(p, "espMobColor", 0xFF5555) & 0xFFFFFF;
+            espOpacity = Math.max(10, Math.min(100, num(p, "espOpacity", 50)));
+
+            tracersEnabled = b(p, "tracersEnabled", false);
+            trPlayers = b(p, "trPlayers", true);
+            trHostile = b(p, "trHostile", false);
+            trPassive = b(p, "trPassive", false);
+            tracerThickness = dbl(p, "tracerThickness", 1.0);
+
+            arrayList = b(p, "arrayList", true);
+            alBackground = b(p, "alBackground", true);
+            alBar = b(p, "alBar", true);
+            alTitle = b(p, "alTitle", true);
+
+            freecamSpeed = dbl(p, "freecamSpeed", 3.0);
+            auraRange = dbl(p, "auraRange", 3.0);
+            auraSpeed = dbl(p, "auraSpeed", 8.0);
+            auraPlayersOnly = b(p, "auraPlayersOnly", true);
+            auraCooldown = b(p, "auraCooldown", true);
+            auraWalls = b(p, "auraWalls", false);
+            auraRotate = b(p, "auraRotate", false);
         } catch (Exception ignored) {
         }
+        lastSig = signature();
+    }
+
+    private static int signature() {
+        return Objects.hash(enabled, Arrays.hashCode(types), radiusChunks);
     }
 
     public static void save() {
-        StorageScanner.requestRescan();
+        int sig = signature();
+        if (sig != lastSig) {
+            lastSig = sig;
+            StorageScanner.requestRescan();   // tylko gdy zmieniło się coś ważnego dla skanera
+        }
         try {
             Properties p = new Properties();
             p.setProperty("enabled", Boolean.toString(enabled));
             for (StorageType t : StorageType.values()) {
                 p.setProperty("type." + t.name(), Boolean.toString(types[t.ordinal()]));
             }
-            p.setProperty("players", Boolean.toString(players));
             p.setProperty("tracers", Boolean.toString(tracers));
             p.setProperty("radius", Integer.toString(radiusChunks));
+
+            p.setProperty("espEnabled", Boolean.toString(espEnabled));
+            p.setProperty("espPlayers", Boolean.toString(espPlayers));
+            p.setProperty("espHostile", Boolean.toString(espHostile));
+            p.setProperty("espPassive", Boolean.toString(espPassive));
+            p.setProperty("espPlayerColor", Integer.toString(espPlayerColor));
+            p.setProperty("espMobColor", Integer.toString(espMobColor));
+            p.setProperty("espOpacity", Integer.toString(espOpacity));
+
+            p.setProperty("tracersEnabled", Boolean.toString(tracersEnabled));
+            p.setProperty("trPlayers", Boolean.toString(trPlayers));
+            p.setProperty("trHostile", Boolean.toString(trHostile));
+            p.setProperty("trPassive", Boolean.toString(trPassive));
+            p.setProperty("tracerThickness", Double.toString(tracerThickness));
+
+            p.setProperty("arrayList", Boolean.toString(arrayList));
+            p.setProperty("alBackground", Boolean.toString(alBackground));
+            p.setProperty("alBar", Boolean.toString(alBar));
+            p.setProperty("alTitle", Boolean.toString(alTitle));
+
             p.setProperty("freecamSpeed", Double.toString(freecamSpeed));
             p.setProperty("auraRange", Double.toString(auraRange));
             p.setProperty("auraSpeed", Double.toString(auraSpeed));
             p.setProperty("auraPlayersOnly", Boolean.toString(auraPlayersOnly));
+            p.setProperty("auraCooldown", Boolean.toString(auraCooldown));
+            p.setProperty("auraWalls", Boolean.toString(auraWalls));
+            p.setProperty("auraRotate", Boolean.toString(auraRotate));
             try (OutputStream out = Files.newOutputStream(file())) {
                 p.store(out, "Storage Finder");
             }

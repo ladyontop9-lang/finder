@@ -3,12 +3,18 @@ package com.example.storagefinder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
@@ -23,117 +29,139 @@ import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.phys.AABB;
 
 /**
- * Skanuje załadowane chunki.
- * Block entity (skrzynie, hoppery, spawnery...) co 2 ticki, bloki szukane po stanie (pistony, ametyst) co 10 ticków.
- * Każda zmiana ustawień wymusza natychmiastowe skanowanie.
+ * Skanowanie z optymalizacją:
+ *  - block entity (skrzynie, hoppery, spawnery) co 2 ticki,
+ *  - bloki szukane po stanie (pistony, ametyst) skanowane przyrostowo, chunk po chunku, z budżetem czasu
+ *    ~1.5 ms na tick i cache per chunk,
+ *  - encje (gracze / moby) co 2 ticki.
  */
 public final class StorageScanner {
     public record Entry(BlockPos pos, StorageType type) {}
 
+    public enum Kind { PLAYER, HOSTILE, PASSIVE }
+
+    public record Target(LivingEntity entity, Kind kind) {}
+
     private static final int N = StorageType.values().length;
+    private static final long BUDGET_NANOS = 1_500_000L;
 
     private static volatile List<Entry> found = List.of();
+    private static volatile List<Target> targets = List.of();
     private static List<Entry> beEntries = List.of();
     private static List<Entry> blockEntries = List.of();
     private static int[] beCounts = new int[N];
     private static int[] blockCounts = new int[N];
-    private static volatile int playerCount = 0;
+
+    private static final Map<Long, List<Entry>> blockCache = new HashMap<>();
+    private static Map<Block, StorageType> blockTypes = new HashMap<>();
+    private static long[] queue = new long[0];
+    private static int qIndex = 0;
+    private static boolean startCycleNow = true;
+
     private static int tickCounter = 0;
     private static volatile boolean rescan = true;
 
     private StorageScanner() {}
 
-    public static void requestRescan() {
-        rescan = true;
-    }
+    public static void requestRescan() { rescan = true; }
 
-    public static List<Entry> found() {
-        return found;
-    }
+    public static List<Entry> found() { return found; }
+
+    public static List<Target> targets() { return targets; }
 
     public static int count(StorageType t) {
         return beCounts[t.ordinal()] + blockCounts[t.ordinal()];
     }
 
-    public static int playerCount() {
-        return playerCount;
+    private static void clearStorage() {
+        found = List.of();
+        beEntries = List.of();
+        blockEntries = List.of();
+        beCounts = new int[N];
+        blockCounts = new int[N];
+        blockCache.clear();
+        qIndex = queue.length;
+        startCycleNow = true;
     }
 
     public static void tick(Minecraft mc) {
-        if (!StorageFinderConfig.enabled) {
-            if (!found.isEmpty()) {
-                found = List.of();
-                beEntries = List.of();
-                blockEntries = List.of();
-                beCounts = new int[N];
-                blockCounts = new int[N];
+        tickCounter++;
+        ClientLevel level = mc.level;
+        if (level == null || mc.player == null) {
+            if (!found.isEmpty() || !targets.isEmpty()) {
+                clearStorage();
+                targets = List.of();
             }
-            playerCount = 0;
-            rescan = true;
             return;
         }
-        ClientLevel level = mc.level;
-        Player player = mc.player;
-        if (level == null || player == null) return;
 
         boolean force = rescan;
-        boolean doBe = force || tickCounter % 2 == 0;
-        boolean doBlocks = force || tickCounter % 10 == 0;
-        tickCounter++;
         rescan = false;
-        if (!doBe && !doBlocks) return;
 
-        if (doBe) playerCount = Math.max(0, level.players().size() - 1);
+        // ---------------- Storage Finder ----------------
+        if (StorageFinderConfig.enabled) {
+            if (force) {
+                blockCache.clear();
+                startCycleNow = true;
+                rebuildBlockTypes();
+            }
+            boolean changed = false;
 
-        List<Entry> newBe = new ArrayList<>();
-        List<Entry> newBlocks = new ArrayList<>();
-        int[] newBeCounts = new int[N];
-        int[] newBlockCounts = new int[N];
+            if (force || tickCounter % 2 == 0) {
+                scanBlockEntities(mc, level);
+                changed = true;
+            }
+            if (!blockTypes.isEmpty()) {
+                changed |= stepBlocks(mc, level);
+            } else if (!blockEntries.isEmpty()) {
+                blockEntries = List.of();
+                blockCounts = new int[N];
+                changed = true;
+            }
 
-        Map<Block, StorageType> blockTypes = new HashMap<>();
-        for (StorageType t : StorageType.values()) {
-            Block b = blockFor(t);
-            if (b != null && StorageFinderConfig.isOn(t)) blockTypes.put(b, t);
+            if (changed) {
+                List<Entry> merged = new ArrayList<>(beEntries.size() + blockEntries.size());
+                merged.addAll(beEntries);
+                merged.addAll(blockEntries);
+                found = merged;
+            }
+        } else if (!found.isEmpty()) {
+            clearStorage();
         }
 
-        ChunkPos center = player.chunkPosition();
+        // ---------------- ESP / Tracers (encje) ----------------
+        if (StorageFinderConfig.espEnabled || StorageFinderConfig.tracersEnabled) {
+            if (tickCounter % 2 == 0) scanEntities(mc, level);
+        } else if (!targets.isEmpty()) {
+            targets = List.of();
+        }
+    }
+
+    // ------------------------------------------------------------------ block entities
+
+    private static void scanBlockEntities(Minecraft mc, ClientLevel level) {
+        List<Entry> list = new ArrayList<>();
+        int[] cnt = new int[N];
+
+        ChunkPos center = mc.player.chunkPosition();
         int r = Math.min(StorageFinderConfig.radiusChunks, mc.options.renderDistance().get());
-        int minSection = level.getMinSectionY();
 
         for (int cx = center.x - r; cx <= center.x + r; cx++) {
             for (int cz = center.z - r; cz <= center.z + r; cz++) {
                 if (!(level.getChunk(cx, cz, ChunkStatus.FULL, false) instanceof LevelChunk chunk)) continue;
-
-                if (doBe) {
-                    for (BlockEntity be : chunk.getBlockEntities().values()) {
-                        StorageType t = typeOf(be);
-                        if (t == null || !StorageFinderConfig.isOn(t)) continue;
-                        newBe.add(new Entry(be.getBlockPos(), t));
-                        newBeCounts[t.ordinal()]++;
-                    }
-                }
-
-                if (doBlocks && !blockTypes.isEmpty()) {
-                    scanBlocks(chunk, minSection, blockTypes, newBlocks, newBlockCounts);
+                for (BlockEntity be : chunk.getBlockEntities().values()) {
+                    StorageType t = typeOf(be);
+                    if (t == null || !StorageFinderConfig.isOn(t)) continue;
+                    list.add(new Entry(be.getBlockPos(), t));
+                    cnt[t.ordinal()]++;
                 }
             }
         }
-
-        if (doBe) {
-            beEntries = newBe;
-            beCounts = newBeCounts;
-        }
-        if (doBlocks) {
-            blockEntries = newBlocks;
-            blockCounts = newBlockCounts;
-        }
-
-        List<Entry> merged = new ArrayList<>(beEntries.size() + blockEntries.size());
-        merged.addAll(beEntries);
-        merged.addAll(blockEntries);
-        found = merged;
+        beEntries = list;
+        beCounts = cnt;
     }
 
     private static StorageType typeOf(BlockEntity be) {
@@ -146,7 +174,8 @@ public final class StorageScanner {
         return null;
     }
 
-    /** Typy, które nie są block entity — szukamy ich po samym bloku. */
+    // ------------------------------------------------------------------ incremental block scan
+
     private static Block blockFor(StorageType t) {
         return switch (t) {
             case PISTON -> Blocks.PISTON;
@@ -156,29 +185,139 @@ public final class StorageScanner {
         };
     }
 
-    private static void scanBlocks(LevelChunk chunk, int minSection, Map<Block, StorageType> blockTypes,
-                                   List<Entry> list, int[] counts) {
+    private static void rebuildBlockTypes() {
+        Map<Block, StorageType> m = new HashMap<>();
+        for (StorageType t : StorageType.values()) {
+            Block b = blockFor(t);
+            if (b != null && StorageFinderConfig.isOn(t)) m.put(b, t);
+        }
+        blockTypes = m;
+    }
+
+    private static long[] buildQueue(ChunkPos center, int r) {
+        List<Long> list = new ArrayList<>();
+        for (int cx = center.x - r; cx <= center.x + r; cx++) {
+            for (int cz = center.z - r; cz <= center.z + r; cz++) {
+                list.add(ChunkPos.asLong(cx, cz));
+            }
+        }
+        list.sort((a, b) -> {
+            long da = (long) (ChunkPos.getX(a) - center.x) * (ChunkPos.getX(a) - center.x)
+                    + (long) (ChunkPos.getZ(a) - center.z) * (ChunkPos.getZ(a) - center.z);
+            long db = (long) (ChunkPos.getX(b) - center.x) * (ChunkPos.getX(b) - center.x)
+                    + (long) (ChunkPos.getZ(b) - center.z) * (ChunkPos.getZ(b) - center.z);
+            return Long.compare(da, db);
+        });
+        long[] arr = new long[list.size()];
+        for (int i = 0; i < arr.length; i++) arr[i] = list.get(i);
+        return arr;
+    }
+
+    /** Zwraca true, jeśli lista wyników się zmieniła. */
+    private static boolean stepBlocks(Minecraft mc, ClientLevel level) {
+        boolean changed = false;
+
+        if (qIndex >= queue.length) {
+            if (!startCycleNow && tickCounter % 10 != 0) return false;   // przerwa między cyklami
+            startCycleNow = false;
+
+            ChunkPos center = mc.player.chunkPosition();
+            int r = Math.min(StorageFinderConfig.radiusChunks, mc.options.renderDistance().get());
+            queue = buildQueue(center, r);
+            qIndex = 0;
+            rebuildBlockTypes();
+
+            Set<Long> keep = new HashSet<>();
+            for (long k : queue) keep.add(k);
+            changed |= blockCache.keySet().removeIf(k -> !keep.contains(k));
+        }
+
+        long deadline = System.nanoTime() + BUDGET_NANOS;
+        int minSection = level.getMinSectionY();
+
+        while (qIndex < queue.length) {
+            long key = queue[qIndex++];
+            int cx = ChunkPos.getX(key), cz = ChunkPos.getZ(key);
+
+            if (!(level.getChunk(cx, cz, ChunkStatus.FULL, false) instanceof LevelChunk chunk)) {
+                if (blockCache.remove(key) != null) changed = true;
+            } else {
+                List<Entry> res = new ArrayList<>();
+                scanChunkBlocks(chunk, minSection, res);
+                List<Entry> old = blockCache.put(key, res.isEmpty() ? List.of() : res);
+                boolean same = (old == null) ? res.isEmpty() : old.equals(res);
+                if (!same) changed = true;
+            }
+            if (System.nanoTime() > deadline) break;
+        }
+
+        if (changed) {
+            List<Entry> merged = new ArrayList<>();
+            int[] cnt = new int[N];
+            for (List<Entry> l : blockCache.values()) {
+                for (Entry e : l) {
+                    merged.add(e);
+                    cnt[e.type().ordinal()]++;
+                }
+            }
+            blockEntries = merged;
+            blockCounts = cnt;
+        }
+        return changed;
+    }
+
+    private static void scanChunkBlocks(LevelChunk chunk, int minSection, List<Entry> out) {
         LevelChunkSection[] sections = chunk.getSections();
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
+        Map<Block, StorageType> types = blockTypes;
 
         for (int i = 0; i < sections.length; i++) {
             LevelChunkSection s = sections[i];
             if (s == null || s.hasOnlyAir()) continue;
-            if (!s.maybeHas(state -> blockTypes.containsKey(state.getBlock()))) continue;
+            if (!s.maybeHas(state -> types.containsKey(state.getBlock()))) continue;
 
             int baseY = (minSection + i) << 4;
             for (int x = 0; x < 16; x++) {
                 for (int y = 0; y < 16; y++) {
                     for (int z = 0; z < 16; z++) {
-                        StorageType t = blockTypes.get(s.getBlockState(x, y, z).getBlock());
-                        if (t != null) {
-                            list.add(new Entry(new BlockPos(baseX + x, baseY + y, baseZ + z), t));
-                            counts[t.ordinal()]++;
-                        }
+                        StorageType t = types.get(s.getBlockState(x, y, z).getBlock());
+                        if (t != null) out.add(new Entry(new BlockPos(baseX + x, baseY + y, baseZ + z), t));
                     }
                 }
             }
         }
+    }
+
+    // ------------------------------------------------------------------ entities
+
+    private static void scanEntities(Minecraft mc, ClientLevel level) {
+        boolean esp = StorageFinderConfig.espEnabled;
+        boolean tr = StorageFinderConfig.tracersEnabled;
+        boolean wantPlayers = (esp && StorageFinderConfig.espPlayers) || (tr && StorageFinderConfig.trPlayers);
+        boolean wantHostile = (esp && StorageFinderConfig.espHostile) || (tr && StorageFinderConfig.trHostile);
+        boolean wantPassive = (esp && StorageFinderConfig.espPassive) || (tr && StorageFinderConfig.trPassive);
+        if (!wantPlayers && !wantHostile && !wantPassive) {
+            targets = List.of();
+            return;
+        }
+
+        Entity center = mc.getCameraEntity() != null ? mc.getCameraEntity() : mc.player;
+        double d = mc.options.renderDistance().get() * 16.0;
+        AABB box = new AABB(center.getX() - d, center.getY() - d, center.getZ() - d,
+                center.getX() + d, center.getY() + d, center.getZ() + d);
+
+        List<Target> list = new ArrayList<>();
+        for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, box)) {
+            if (e == mc.player || e.isRemoved() || e.isSpectator()) continue;
+            if (e instanceof Player) {
+                if (wantPlayers) list.add(new Target(e, Kind.PLAYER));
+            } else if (e instanceof Enemy) {
+                if (wantHostile) list.add(new Target(e, Kind.HOSTILE));
+            } else if (e instanceof Mob && e.isAttackable()) {
+                if (wantPassive) list.add(new Target(e, Kind.PASSIVE));
+            }
+        }
+        targets = list;
     }
 }

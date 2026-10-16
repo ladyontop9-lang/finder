@@ -13,17 +13,20 @@ public enum StorageType {
 
     public final String label;
     public final int rgb;
+    private final float[] floats;
 
     StorageType(String label, int rgb) {
         this.label = label;
         this.rgb = rgb;
+        this.floats = new float[]{((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f};
     }
 
     public int argb() {
         return 0xFF000000 | rgb;
     }
 
+    /** Zwraca stałą tablicę (bez alokacji) — nie modyfikować. */
     public float[] rgbFloats() {
-        return new float[]{((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f};
+        return floats;
     }
 }

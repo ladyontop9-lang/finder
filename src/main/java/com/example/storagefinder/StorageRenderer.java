@@ -25,7 +25,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.util.Mth;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.Vec3;
@@ -66,59 +68,88 @@ public final class StorageRenderer {
     // ---------- Extraction ----------
 
     private static void onRender(WorldRenderContext context) {
-        if (!StorageFinderConfig.enabled) return;
+        boolean sf = StorageFinderConfig.enabled;
+        boolean esp = StorageFinderConfig.espEnabled;
+        boolean tr = StorageFinderConfig.tracersEnabled;
+        if (!sf && !esp && !tr) return;
 
         Minecraft mc = Minecraft.getInstance();
-        java.util.List<StorageScanner.Entry> entries = StorageScanner.found();
-        boolean showPlayers = StorageFinderConfig.players && mc.level != null && mc.player != null;
-        if (entries.isEmpty() && !showPlayers) return;
+        ClientLevel level = mc.level;
+        if (level == null || mc.player == null) return;
+
+        java.util.List<StorageScanner.Entry> entries = sf ? StorageScanner.found() : java.util.List.of();
+        java.util.List<StorageScanner.Target> targets = (esp || tr) ? StorageScanner.targets() : java.util.List.of();
+        if (entries.isEmpty() && targets.isEmpty()) return;
+
+        boolean blockTracers = sf && StorageFinderConfig.tracers;
+        float pt = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        float thick = (float) StorageFinderConfig.tracerThickness;
+
+        Vec3 look = null;
+        if (blockTracers || tr) {
+            var viewer = mc.getCameraEntity() != null ? mc.getCameraEntity() : mc.player;
+            look = viewer.getViewVector(pt);
+        }
 
         PoseStack matrices = context.matrices();
         Vec3 camera = context.worldState().cameraRenderState.pos;
 
-        boolean tracers = StorageFinderConfig.tracers && mc.player != null;
-        Vec3 look = null;
-        if (tracers) {
-            var viewer = mc.getCameraEntity() != null ? mc.getCameraEntity() : mc.player;
-            look = viewer.getViewVector(mc.getDeltaTracker().getGameTimeDeltaPartialTick(false));
-        }
-
         matrices.pushPose();
         matrices.translate(-camera.x, -camera.y, -camera.z);
+        Matrix4fc pose = matrices.last().pose();
 
+        // ---- bloki (Storage Finder) ----
         for (StorageScanner.Entry e : entries) {
             BlockPos p = e.pos();
-            if (mc.level != null && mc.level.getBlockState(p).isAir()) continue;
+            if (level.getBlockState(p).isAir()) continue;
             ensureBuffer();
             float[] c = e.type().rgbFloats();
-            renderFilledBox(matrices.last().pose(), buffer,
+            renderFilledBox(pose, buffer,
                     p.getX() - GROW, p.getY() - GROW, p.getZ() - GROW,
                     p.getX() + 1 + GROW, p.getY() + 1 + GROW, p.getZ() + 1 + GROW,
                     c[0], c[1], c[2], ALPHA);
-            if (tracers) {
-                renderTracer(matrices.last().pose(), buffer, camera, look,
-                        p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, c[0], c[1], c[2], 0.9f);
+            if (blockTracers) {
+                renderTracer(pose, buffer, camera, look,
+                        p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, c[0], c[1], c[2], 0.9f, thick);
             }
         }
 
-        if (showPlayers) {
-            float pt = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
-            for (var other : mc.level.players()) {
-                if (other == mc.player) continue;
-                double x = Mth.lerp(pt, other.xo, other.getX());
-                double y = Mth.lerp(pt, other.yo, other.getY());
-                double z = Mth.lerp(pt, other.zo, other.getZ());
-                float hw = other.getBbWidth() / 2f;
-                float h = other.getBbHeight();
-                ensureBuffer();
-                renderFilledBox(matrices.last().pose(), buffer,
+        // ---- gracze / moby (ESP + Tracers) ----
+        for (StorageScanner.Target t : targets) {
+            LivingEntity e = t.entity();
+            if (e.isRemoved()) continue;
+
+            boolean boxOn = esp && switch (t.kind()) {
+                case PLAYER -> StorageFinderConfig.espPlayers;
+                case HOSTILE -> StorageFinderConfig.espHostile;
+                case PASSIVE -> StorageFinderConfig.espPassive;
+            };
+            boolean lineOn = tr && switch (t.kind()) {
+                case PLAYER -> StorageFinderConfig.trPlayers;
+                case HOSTILE -> StorageFinderConfig.trHostile;
+                case PASSIVE -> StorageFinderConfig.trPassive;
+            };
+            if (!boxOn && !lineOn) continue;
+
+            int rgb = t.kind() == StorageScanner.Kind.PLAYER
+                    ? StorageFinderConfig.espPlayerColor : StorageFinderConfig.espMobColor;
+            float r = ((rgb >> 16) & 255) / 255f, g = ((rgb >> 8) & 255) / 255f, b = (rgb & 255) / 255f;
+
+            double x = Mth.lerp(pt, e.xo, e.getX());
+            double y = Mth.lerp(pt, e.yo, e.getY());
+            double z = Mth.lerp(pt, e.zo, e.getZ());
+            float hw = e.getBbWidth() / 2f;
+            float h = e.getBbHeight();
+
+            ensureBuffer();
+            if (boxOn) {
+                renderFilledBox(pose, buffer,
                         (float) (x - hw), (float) y, (float) (z - hw),
                         (float) (x + hw), (float) (y + h), (float) (z + hw),
-                        0.24f, 0.84f, 1.0f, 0.5f);
-                if (tracers) {
-                    renderTracer(matrices.last().pose(), buffer, camera, look,
-                            x, y + h / 2.0, z, 0.24f, 0.84f, 1.0f, 0.9f);
-                }
+                        r, g, b, StorageFinderConfig.espOpacity / 100f);
+            }
+            if (lineOn) {
+                renderTracer(pose, buffer, camera, look, x, y + h / 2.0, z, r, g, b, 0.9f, thick);
             }
         }
 
@@ -132,7 +163,7 @@ public final class StorageRenderer {
     /** Cienka linia (billboard) od celownika do celu. Grubość rośnie z dystansem, więc na ekranie ma stałą szerokość. */
     private static void renderTracer(Matrix4fc m, BufferBuilder b, Vec3 cam, Vec3 look,
                                      double tx, double ty, double tz,
-                                     float r, float g, float bl, float a) {
+                                     float r, float g, float bl, float a, float thick) {
         double ax = cam.x + look.x * 0.8, ay = cam.y + look.y * 0.8, az = cam.z + look.z * 0.8;
         double dx = tx - ax, dy = ty - ay, dz = tz - az;
 
@@ -143,7 +174,7 @@ public final class StorageRenderer {
         px /= len; py /= len; pz /= len;
 
         double dEnd = Math.sqrt((tx - cam.x) * (tx - cam.x) + (ty - cam.y) * (ty - cam.y) + (tz - cam.z) * (tz - cam.z));
-        double wA = 0.0008, wB = dEnd * 0.0010;
+        double wA = 0.0008 * thick, wB = dEnd * 0.0010 * thick;
 
         float a1x = (float) (ax + px * wA), a1y = (float) (ay + py * wA), a1z = (float) (az + pz * wA);
         float a2x = (float) (ax - px * wA), a2y = (float) (ay - py * wA), a2z = (float) (az - pz * wA);
