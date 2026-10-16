@@ -43,6 +43,10 @@ public final class StorageFinderConfig {
     public static double freecamSpeed = 3.0;
     public static double auraRange = 3.0;
     public static double auraSpeed = 8.0;
+        public static double auraRotSpeed = 60.0;
+    public static double auraJitter = 0.1;
+    public static boolean auraRandomDelay = true;
+
     public static boolean auraPlayersOnly = true;
     public static boolean auraCooldown = true;
     public static boolean auraWalls = false;
@@ -122,6 +126,10 @@ public final class StorageFinderConfig {
             freecamSpeed = dbl(p, "freecamSpeed", 3.0);
             auraRange = dbl(p, "auraRange", 3.0);
             auraSpeed = dbl(p, "auraSpeed", 8.0);
+                        auraRotSpeed = dbl(p, "auraRotSpeed", 60.0);
+            auraJitter = dbl(p, "auraJitter", 0.1);
+            auraRandomDelay = b(p, "auraRandomDelay", true);
+
             auraPlayersOnly = b(p, "auraPlayersOnly", true);
             auraCooldown = b(p, "auraCooldown", true);
             auraWalls = b(p, "auraWalls", false);
@@ -172,6 +180,10 @@ public final class StorageFinderConfig {
             p.setProperty("freecamSpeed", Double.toString(freecamSpeed));
             p.setProperty("auraRange", Double.toString(auraRange));
             p.setProperty("auraSpeed", Double.toString(auraSpeed));
+                        p.setProperty("auraRotSpeed", Double.toString(auraRotSpeed));
+            p.setProperty("auraJitter", Double.toString(auraJitter));
+            p.setProperty("auraRandomDelay", Boolean.toString(auraRandomDelay));
+
             p.setProperty("auraPlayersOnly", Boolean.toString(auraPlayersOnly));
             p.setProperty("auraCooldown", Boolean.toString(auraCooldown));
             p.setProperty("auraWalls", Boolean.toString(auraWalls));
