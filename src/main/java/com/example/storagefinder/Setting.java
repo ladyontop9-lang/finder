@@ -76,4 +76,45 @@ public abstract class Setting {
         public int get() { return getter.getAsInt() & 0xFFFFFF; }
         public void set(int rgb) { setter.accept(rgb & 0xFFFFFF); }
     }
+
+    /** Wybór jednej opcji z listy (chipy). */
+    public static final class Mode extends Setting {
+        public final String[] options;
+        private final IntSupplier getter;
+        private final IntConsumer setter;
+
+        public Mode(String name, String[] options, IntSupplier getter, IntConsumer setter) {
+            super(name);
+            this.options = options;
+            this.getter = getter;
+            this.setter = setter;
+        }
+
+        public int get() { return Math.max(0, Math.min(options.length - 1, getter.getAsInt())); }
+        public void set(int i) { setter.accept(i); }
+    }
+
+    /** Wybór koloru z gotowych próbek. */
+    public static final class Swatches extends Setting {
+        public final String[] names;
+        public final int[] colors;
+        private final IntSupplier getter;
+        private final IntConsumer setter;
+
+        public Swatches(String name, String[] names, int[] colors, IntSupplier getter, IntConsumer setter) {
+            super(name);
+            this.names = names;
+            this.colors = colors;
+            this.getter = getter;
+            this.setter = setter;
+        }
+
+        public int selected() {
+            int cur = getter.getAsInt() & 0xFFFFFF;
+            for (int i = 0; i < colors.length; i++) if ((colors[i] & 0xFFFFFF) == cur) return i;
+            return -1;
+        }
+
+        public void set(int i) { setter.accept(colors[i] & 0xFFFFFF); }
+    }
 }
