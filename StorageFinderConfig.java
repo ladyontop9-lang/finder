@@ -36,16 +36,15 @@ public final class StorageFinderConfig {
     // ---- ArrayList ----
     public static boolean arrayList = true;
     public static boolean alBackground = true;
-    public static boolean alBar = true;
-    public static boolean alTitle = true;
+    public static boolean alSuffix = true;
+    public static int alColorMode = 2;             // 0 Static, 1 Rainbow, 2 Gradient
+    public static int alSort = 0;                  // 0 Length, 1 A-Z
+    public static int accent = 0x3D8BFF;
 
     // ---- Freecam / Aura ----
     public static double freecamSpeed = 3.0;
     public static double auraRange = 3.0;
     public static double auraSpeed = 8.0;
-    public static double auraRotSpeed = 60.0;
-    public static double auraJitter = 0.1;
-    public static boolean auraRandomDelay = true;
     public static boolean auraPlayersOnly = true;
     public static boolean auraCooldown = true;
     public static boolean auraWalls = false;
@@ -119,15 +118,14 @@ public final class StorageFinderConfig {
 
             arrayList = b(p, "arrayList", true);
             alBackground = b(p, "alBackground", true);
-            alBar = b(p, "alBar", true);
-            alTitle = b(p, "alTitle", true);
+            alSuffix = b(p, "alSuffix", true);
+            alColorMode = Math.max(0, Math.min(2, num(p, "alColorMode", 2)));
+            alSort = Math.max(0, Math.min(1, num(p, "alSort", 0)));
+            accent = num(p, "accent", 0x3D8BFF) & 0xFFFFFF;
 
             freecamSpeed = dbl(p, "freecamSpeed", 3.0);
             auraRange = dbl(p, "auraRange", 3.0);
             auraSpeed = dbl(p, "auraSpeed", 8.0);
-            auraRotSpeed = dbl(p, "auraRotSpeed", 60.0);
-            auraJitter = Math.min(0.3, dbl(p, "auraJitter", 0.1));
-            auraRandomDelay = b(p, "auraRandomDelay", true);
             auraPlayersOnly = b(p, "auraPlayersOnly", true);
             auraCooldown = b(p, "auraCooldown", true);
             auraWalls = b(p, "auraWalls", false);
@@ -172,15 +170,14 @@ public final class StorageFinderConfig {
 
             p.setProperty("arrayList", Boolean.toString(arrayList));
             p.setProperty("alBackground", Boolean.toString(alBackground));
-            p.setProperty("alBar", Boolean.toString(alBar));
-            p.setProperty("alTitle", Boolean.toString(alTitle));
+            p.setProperty("alSuffix", Boolean.toString(alSuffix));
+            p.setProperty("alColorMode", Integer.toString(alColorMode));
+            p.setProperty("alSort", Integer.toString(alSort));
+            p.setProperty("accent", Integer.toString(accent));
 
             p.setProperty("freecamSpeed", Double.toString(freecamSpeed));
             p.setProperty("auraRange", Double.toString(auraRange));
             p.setProperty("auraSpeed", Double.toString(auraSpeed));
-            p.setProperty("auraRotSpeed", Double.toString(auraRotSpeed));
-            p.setProperty("auraJitter", Double.toString(auraJitter));
-            p.setProperty("auraRandomDelay", Boolean.toString(auraRandomDelay));
             p.setProperty("auraPlayersOnly", Boolean.toString(auraPlayersOnly));
             p.setProperty("auraCooldown", Boolean.toString(auraCooldown));
             p.setProperty("auraWalls", Boolean.toString(auraWalls));
