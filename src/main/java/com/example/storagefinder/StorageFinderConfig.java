@@ -49,6 +49,7 @@ public final class StorageFinderConfig {
     public static boolean auraCooldown = true;
     public static boolean auraWalls = false;
     public static boolean auraRotate = false;
+    public static boolean auraSilent = true;        // cicha rotacja (kamera się nie obraca)
     public static boolean auraRandomDelay = false;
     public static double auraRotSpeed = 40.0;      // maks. obrót na tick (stopnie)
     public static double auraJitter = 0.15;
@@ -133,6 +134,7 @@ public final class StorageFinderConfig {
             auraCooldown = b(p, "auraCooldown", true);
             auraWalls = b(p, "auraWalls", false);
             auraRotate = b(p, "auraRotate", false);
+            auraSilent = b(p, "auraSilent", true);
             auraRandomDelay = b(p, "auraRandomDelay", false);
             auraRotSpeed = dbl(p, "auraRotSpeed", 40.0);
             auraJitter = dbl(p, "auraJitter", 0.15);
@@ -188,6 +190,7 @@ public final class StorageFinderConfig {
             p.setProperty("auraCooldown", Boolean.toString(auraCooldown));
             p.setProperty("auraWalls", Boolean.toString(auraWalls));
             p.setProperty("auraRotate", Boolean.toString(auraRotate));
+            p.setProperty("auraSilent", Boolean.toString(auraSilent));
             p.setProperty("auraRandomDelay", Boolean.toString(auraRandomDelay));
             p.setProperty("auraRotSpeed", Double.toString(auraRotSpeed));
             p.setProperty("auraJitter", Double.toString(auraJitter));

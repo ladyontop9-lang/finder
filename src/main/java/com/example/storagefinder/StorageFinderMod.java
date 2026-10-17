@@ -49,7 +49,8 @@ public class StorageFinderMod implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(StorageScanner::tick);
 
-        ClientTickEvents.END_CLIENT_TICK.register(Aura::tick);
+        ClientTickEvents.START_CLIENT_TICK.register(Aura::tickStart);
+        ClientTickEvents.END_CLIENT_TICK.register(Aura::tickEnd);
 
         Freecam.init();
         Hud.init();

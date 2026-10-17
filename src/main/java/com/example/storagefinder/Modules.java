@@ -26,7 +26,7 @@ public final class Modules {
     static {
         // ---- Combat ----
         ALL.add(new Module("Aura", "Combat",
-                "Attacks the closest target in range on its own. Waits for cooldown and skips targets that just got hit.",
+                "Attacks the closest target in range on its own. Silent rotation aims at the target for the server without turning your camera.",
                 Aura::isEnabled, Aura::setEnabled, List.of(
                 new Setting.Slider("Range", 3, 6, 0.1, false,
                         () -> StorageFinderConfig.auraRange, v -> StorageFinderConfig.auraRange = v),
@@ -38,13 +38,11 @@ public final class Modules {
                         () -> StorageFinderConfig.auraCooldown, v -> StorageFinderConfig.auraCooldown = v),
                 new Setting.Bool("Through walls", NONE,
                         () -> StorageFinderConfig.auraWalls, v -> StorageFinderConfig.auraWalls = v),
-                new Setting.Bool("Face target", NONE,
-                        () -> StorageFinderConfig.auraRotate, v -> StorageFinderConfig.auraRotate = v),
+                new Setting.Bool("Silent rotation", NONE,
+                        () -> StorageFinderConfig.auraSilent, v -> StorageFinderConfig.auraSilent = v),
                 new Setting.Bool("Random delay", NONE,
                         () -> StorageFinderConfig.auraRandomDelay, v -> StorageFinderConfig.auraRandomDelay = v),
-                new Setting.Slider("Rotation speed", 5, 180, 5, true,
-                        () -> StorageFinderConfig.auraRotSpeed, v -> StorageFinderConfig.auraRotSpeed = v),
-                new Setting.Slider("Jitter", 0.02, 0.5, 0.01, false,
+                new Setting.Slider("Aim jitter", 0.0, 0.5, 0.05, false,
                         () -> StorageFinderConfig.auraJitter, v -> StorageFinderConfig.auraJitter = v)
         )).withSuffix(() -> StorageFinderConfig.auraPlayersOnly ? "Players" : "All"));
 
