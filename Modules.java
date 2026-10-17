@@ -39,7 +39,13 @@ public final class Modules {
                 new Setting.Bool("Through walls", NONE,
                         () -> StorageFinderConfig.auraWalls, v -> StorageFinderConfig.auraWalls = v),
                 new Setting.Bool("Face target", NONE,
-                        () -> StorageFinderConfig.auraRotate, v -> StorageFinderConfig.auraRotate = v)
+                        () -> StorageFinderConfig.auraRotate, v -> StorageFinderConfig.auraRotate = v),
+                new Setting.Bool("Random delay", NONE,
+                        () -> StorageFinderConfig.auraRandomDelay, v -> StorageFinderConfig.auraRandomDelay = v),
+                new Setting.Slider("Rotation speed", 5, 180, 5, true,
+                        () -> StorageFinderConfig.auraRotSpeed, v -> StorageFinderConfig.auraRotSpeed = v),
+                new Setting.Slider("Jitter", 0.02, 0.5, 0.01, false,
+                        () -> StorageFinderConfig.auraJitter, v -> StorageFinderConfig.auraJitter = v)
         )).withSuffix(() -> StorageFinderConfig.auraPlayersOnly ? "Players" : "All"));
 
         // ---- Render ----
