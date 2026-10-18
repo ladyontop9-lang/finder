@@ -43,9 +43,11 @@ public final class Hud {
     }
 
     private static void render(GuiGraphics g) {
-        if (!StorageFinderConfig.arrayList) return;
+        if (!Krux.licensed()) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.options.hideGui || mc.player == null) return;
+        renderInfo(g, mc);
+        if (!StorageFinderConfig.arrayList) return;
 
         boolean sfx = StorageFinderConfig.alSuffix;
         items.clear();
@@ -86,6 +88,30 @@ public final class Hud {
             if (!it.suffix().isEmpty()) {
                 g.drawString(mc.font, it.suffix(), right - w + 5 + mc.font.width(it.name()) + 5, y + 2, 0xFF9A9DB8);
             }
+            y += lh;
+        }
+    }
+
+    /** Moduł Info: współrzędne, FPS i kierunek w lewym górnym rogu. */
+    private static void renderInfo(GuiGraphics g, Minecraft mc) {
+        if (!StorageFinderConfig.infoEnabled) return;
+        int accent = 0xFF000000 | StorageFinderConfig.accent;
+        int lh = mc.font.lineHeight + 3;
+        int y = 3;
+        List<String> lines = new ArrayList<>();
+        if (StorageFinderConfig.infoCoords) {
+            lines.add("XYZ  " + mc.player.getBlockX() + "  " + mc.player.getBlockY() + "  " + mc.player.getBlockZ());
+        }
+        if (StorageFinderConfig.infoFps) lines.add("FPS  " + mc.getFps());
+        if (StorageFinderConfig.infoDir) {
+            String d = mc.player.getDirection().getName();
+            lines.add("Facing  " + d.substring(0, 1).toUpperCase() + d.substring(1));
+        }
+        for (String line : lines) {
+            int w = mc.font.width(line) + 9;
+            if (StorageFinderConfig.alBackground) g.fill(3, y, 3 + w, y + lh, 0x8C07070C);
+            g.fill(0, y, 3, y + lh, accent);
+            g.drawString(mc.font, line, 3 + 5, y + 2, 0xFFEFEAFF);
             y += lh;
         }
     }

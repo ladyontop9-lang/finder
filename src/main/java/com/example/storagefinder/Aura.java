@@ -5,6 +5,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
@@ -40,6 +41,22 @@ public final class Aura {
                 && p.isAlive() && !p.isUsingItem();
     }
 
+    /** Czy TY możesz teraz zadać krytyk (spadasz, nie sprintujesz, nie jesteś w wodzie itd.). */
+    private static boolean canCrit(LocalPlayer p) {
+        return p.fallDistance > 0.0 && !p.onGround() && !p.onClimbable() && !p.isInWater()
+                && !p.hasEffect(MobEffects.BLINDNESS) && !p.isPassenger() && !p.isSprinting();
+    }
+
+    /** Warunek "Hit when": zawsze / na ziemi / gdy może być krytyk / ziemia lub krytyk. */
+    private static boolean modeOk(LocalPlayer p) {
+        return switch (StorageFinderConfig.auraHitMode) {
+            case 1 -> p.onGround();
+            case 2 -> canCrit(p);
+            case 3 -> p.onGround() || canCrit(p);
+            default -> true;
+        };
+    }
+
     private static boolean validTarget(LocalPlayer p, LivingEntity e, Vec3 eye, double r2, boolean playersOnly, boolean walls) {
         if (e == p || !e.isAlive() || e.isSpectator() || !e.isAttackable()) return false;
         if (e.hurtTime > 1) return false;                                   // jeszcze ma i-frames
@@ -63,6 +80,7 @@ public final class Aura {
 
         LocalPlayer p = mc.player;
         ClientLevel level = mc.level;
+        if (!modeOk(p)) return;
 
         // na początku ticka licznik ataku jest jeszcze o 1 tick do tyłu -> przewidujemy (+1.0)
         if (StorageFinderConfig.auraCooldown && p.getAttackStrengthScale(1.0f) < 0.95f) return;
@@ -117,7 +135,7 @@ public final class Aura {
     public static void tickEnd(Minecraft mc) {
         LocalPlayer p = mc.player;
         try {
-            if (pending != null && enabled && p != null && ready(mc)) {
+            if (pending != null && enabled && p != null && ready(mc) && modeOk(p)) {
                 Vec3 eye = p.getEyePosition();
                 double range = StorageFinderConfig.auraRange;
                 if (validTarget(p, pending, eye, range * range,

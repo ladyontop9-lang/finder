@@ -68,6 +68,7 @@ public final class StorageRenderer {
     // ---------- Extraction ----------
 
     private static void onRender(WorldRenderContext context) {
+        if (!Krux.licensed()) return;
         boolean sf = StorageFinderConfig.enabled;
         boolean esp = StorageFinderConfig.espEnabled;
         boolean tr = StorageFinderConfig.tracersEnabled;

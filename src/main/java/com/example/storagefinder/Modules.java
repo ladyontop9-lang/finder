@@ -10,10 +10,10 @@ public final class Modules {
     private static final int MOB = 0xFFFF5555;
     private static final int PASSIVE = 0xFF58D68D;
 
-    public static final String[] ACCENT_NAMES = {"Blue", "Amethyst", "Redstone", "Diamond", "Emerald", "Gold"};
-    public static final int[] ACCENT_COLORS = {0x3D8BFF, 0xB06BFF, 0xFF4B4B, 0x45E0E6, 0x3FE07D, 0xFFC73A};
+    public static final String[] ACCENT_NAMES = {"Violet", "Blue", "Redstone", "Diamond", "Emerald", "Gold"};
+    public static final int[] ACCENT_COLORS = {0xA78BFA, 0x3D8BFF, 0xFF4B4B, 0x45E0E6, 0x3FE07D, 0xFFC73A};
 
-    public static final List<String> CATEGORIES = List.of("Combat", "Render", "HUD");
+    public static final List<String> CATEGORIES = List.of("Combat", "Movement", "Misc", "Render");
     public static final List<Module> ALL = new ArrayList<>();
     public static final Module ARRAY_LIST;
 
@@ -24,14 +24,17 @@ public final class Modules {
     }
 
     static {
-        // ---- Combat ----
+        // ---------------- Combat ----------------
         ALL.add(new Module("Aura", "Combat",
-                "Attacks the closest target in range on its own. Silent rotation aims at the target for the server without turning your camera.",
+                "Attacks the closest target in range on its own.",
+                new String[]{"Aim", "Legit"},
                 Aura::isEnabled, Aura::setEnabled, List.of(
                 new Setting.Slider("Range", 3, 6, 0.1, false,
                         () -> StorageFinderConfig.auraRange, v -> StorageFinderConfig.auraRange = v),
                 new Setting.Slider("Speed", 1, 20, 1, true,
                         () -> StorageFinderConfig.auraSpeed, v -> StorageFinderConfig.auraSpeed = v),
+                new Setting.Mode("Hit when", new String[]{"Always", "On ground", "Can crit", "Ground or crit"},
+                        () -> StorageFinderConfig.auraHitMode, v -> StorageFinderConfig.auraHitMode = v),
                 new Setting.Bool("Players only", NONE,
                         () -> StorageFinderConfig.auraPlayersOnly, v -> StorageFinderConfig.auraPlayersOnly = v),
                 new Setting.Bool("Wait for cooldown", NONE,
@@ -46,7 +49,21 @@ public final class Modules {
                         () -> StorageFinderConfig.auraJitter, v -> StorageFinderConfig.auraJitter = v)
         )).withSuffix(() -> StorageFinderConfig.auraPlayersOnly ? "Players" : "All"));
 
-        // ---- Render ----
+        // ---------------- Movement ----------------
+        ALL.add(new Module("Sprint", "Movement",
+                "Sprints automatically while you walk forward.",
+                new String[]{"Basics", "Utility"},
+                Sprint::isEnabled, Sprint::setEnabled, List.of()));
+
+        ALL.add(new Module("Freecam", "Movement",
+                "Fly the camera freely while your character stays in place.",
+                new String[]{"Camera", "Utility"},
+                Freecam::isActive, Freecam::setActive, List.of(
+                new Setting.Slider("Speed", 1, 10, 0.5, false,
+                        () -> StorageFinderConfig.freecamSpeed, v -> StorageFinderConfig.freecamSpeed = v)
+        )).withSuffix(() -> f1(StorageFinderConfig.freecamSpeed)));
+
+        // ---------------- Render ----------------
         List<Setting> sf = new ArrayList<>();
         for (StorageType t : StorageType.values()) {
             sf.add(new Setting.Bool(t.label, t.argb(),
@@ -58,11 +75,13 @@ public final class Modules {
                 () -> StorageFinderConfig.radiusChunks, v -> StorageFinderConfig.radiusChunks = (int) Math.round(v)));
         ALL.add(new Module("Storage Finder", "Render",
                 "Finds chests, barrels, spawners, hoppers, pistons and amethyst through walls.",
+                new String[]{"Search", "Blocks"},
                 () -> StorageFinderConfig.enabled, v -> StorageFinderConfig.enabled = v, sf)
                 .withSuffix(() -> String.valueOf(StorageScanner.found().size())));
 
         ALL.add(new Module("ESP", "Render",
-                "Draws boxes around players and mobs, visible through walls. Pick the colors yourself.",
+                "Boxes around players and mobs, visible through walls.",
+                new String[]{"Entities", "Visual"},
                 () -> StorageFinderConfig.espEnabled, v -> StorageFinderConfig.espEnabled = v, List.of(
                 new Setting.Bool("Players", PLAYER,
                         () -> StorageFinderConfig.espPlayers, v -> StorageFinderConfig.espPlayers = v),
@@ -79,7 +98,8 @@ public final class Modules {
         )).withSuffix(() -> StorageFinderConfig.espPlayers ? "Players" : "Mobs"));
 
         ALL.add(new Module("Tracers", "Render",
-                "Draws a line from your crosshair to players and mobs. Uses the ESP colors.",
+                "Lines from your crosshair to players and mobs. Uses the ESP colors.",
+                new String[]{"Lines", "Visual"},
                 () -> StorageFinderConfig.tracersEnabled, v -> StorageFinderConfig.tracersEnabled = v, List.of(
                 new Setting.Bool("Players", PLAYER,
                         () -> StorageFinderConfig.trPlayers, v -> StorageFinderConfig.trPlayers = v),
@@ -91,16 +111,23 @@ public final class Modules {
                         () -> StorageFinderConfig.tracerThickness, v -> StorageFinderConfig.tracerThickness = v)
         )));
 
-        ALL.add(new Module("Freecam", "Render",
-                "Fly the camera around freely while your character stays where it is.",
-                Freecam::isActive, Freecam::setActive, List.of(
-                new Setting.Slider("Speed", 1, 10, 0.5, false,
-                        () -> StorageFinderConfig.freecamSpeed, v -> StorageFinderConfig.freecamSpeed = v)
-        )).withSuffix(() -> f1(StorageFinderConfig.freecamSpeed)));
+        ALL.add(new Module("Fullbright", "Render",
+                "Full brightness everywhere, even in caves and at night.",
+                new String[]{"Light"},
+                Fullbright::isEnabled, Fullbright::setEnabled, List.of()));
 
-        // ---- HUD ----
-        ARRAY_LIST = new Module("ArrayList", "HUD",
+        ALL.add(new Module("Zoom", "Render",
+                "Zooms the view in. The previous FOV is restored when you turn it off.",
+                new String[]{"FOV"},
+                Zoom::isEnabled, Zoom::setEnabled, List.of(
+                new Setting.Slider("Zoom FOV", 30, 90, 1, true,
+                        () -> StorageFinderConfig.zoomFov, v -> StorageFinderConfig.zoomFov = (int) Math.round(v))
+        )));
+
+        // ---------------- Misc ----------------
+        ARRAY_LIST = new Module("ArrayList", "Misc",
                 "Lists enabled modules in the top right corner. The accent color applies to the whole client.",
+                new String[]{"HUD"},
                 () -> StorageFinderConfig.arrayList, v -> StorageFinderConfig.arrayList = v, List.of(
                 new Setting.Swatches("Accent", ACCENT_NAMES, ACCENT_COLORS,
                         () -> StorageFinderConfig.accent, v -> StorageFinderConfig.accent = v),
@@ -114,5 +141,17 @@ public final class Modules {
                         () -> StorageFinderConfig.alBackground, v -> StorageFinderConfig.alBackground = v)
         ));
         ALL.add(ARRAY_LIST);
+
+        ALL.add(new Module("Info", "Misc",
+                "Shows coordinates, FPS and facing direction in the top left corner.",
+                new String[]{"HUD", "Info"},
+                () -> StorageFinderConfig.infoEnabled, v -> StorageFinderConfig.infoEnabled = v, List.of(
+                new Setting.Bool("Coordinates", NONE,
+                        () -> StorageFinderConfig.infoCoords, v -> StorageFinderConfig.infoCoords = v),
+                new Setting.Bool("FPS", NONE,
+                        () -> StorageFinderConfig.infoFps, v -> StorageFinderConfig.infoFps = v),
+                new Setting.Bool("Direction", NONE,
+                        () -> StorageFinderConfig.infoDir, v -> StorageFinderConfig.infoDir = v)
+        )));
     }
 }

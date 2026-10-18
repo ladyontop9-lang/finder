@@ -5,6 +5,8 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.Objects;
 import java.util.Properties;
 
@@ -39,7 +41,17 @@ public final class StorageFinderConfig {
     public static boolean alSuffix = true;
     public static int alColorMode = 2;             // 0 Static, 1 Rainbow, 2 Gradient
     public static int alSort = 0;                  // 0 Length, 1 A-Z
-    public static int accent = 0x3D8BFF;
+    public static int accent = 0xA78BFA;
+
+    // ---- nowe moduły ----
+    public static int zoomFov = 30;
+    public static boolean infoEnabled = false;
+    public static boolean infoCoords = true;
+    public static boolean infoFps = true;
+    public static boolean infoDir = true;
+
+    // ---- ulubione moduły (gwiazdki w GUI) ----
+    public static final Set<String> favorites = new LinkedHashSet<>();
 
     // ---- Freecam / Aura ----
     public static double freecamSpeed = 3.0;
@@ -49,6 +61,7 @@ public final class StorageFinderConfig {
     public static boolean auraCooldown = true;
     public static boolean auraWalls = false;
     public static boolean auraRotate = false;
+    public static int auraHitMode = 3;              // 0 Always, 1 Ground, 2 Crit, 3 Ground / Crit
     public static boolean auraSilent = true;        // cicha rotacja (kamera się nie obraca)
     public static boolean auraRandomDelay = false;
     public static double auraRotSpeed = 40.0;      // maks. obrót na tick (stopnie)
@@ -125,7 +138,16 @@ public final class StorageFinderConfig {
             alSuffix = b(p, "alSuffix", true);
             alColorMode = Math.max(0, Math.min(2, num(p, "alColorMode", 2)));
             alSort = Math.max(0, Math.min(1, num(p, "alSort", 0)));
-            accent = num(p, "accent", 0x3D8BFF) & 0xFFFFFF;
+            accent = num(p, "accent", 0xA78BFA) & 0xFFFFFF;
+            zoomFov = Math.max(30, Math.min(90, num(p, "zoomFov", 30)));
+            infoEnabled = b(p, "infoEnabled", false);
+            infoCoords = b(p, "infoCoords", true);
+            infoFps = b(p, "infoFps", true);
+            infoDir = b(p, "infoDir", true);
+            favorites.clear();
+            for (String f : p.getProperty("favorites", "").split(",")) {
+                if (!f.isBlank()) favorites.add(f.trim());
+            }
 
             freecamSpeed = dbl(p, "freecamSpeed", 3.0);
             auraRange = dbl(p, "auraRange", 3.0);
@@ -134,6 +156,7 @@ public final class StorageFinderConfig {
             auraCooldown = b(p, "auraCooldown", true);
             auraWalls = b(p, "auraWalls", false);
             auraRotate = b(p, "auraRotate", false);
+            auraHitMode = Math.max(0, Math.min(3, num(p, "auraHitMode", 3)));
             auraSilent = b(p, "auraSilent", true);
             auraRandomDelay = b(p, "auraRandomDelay", false);
             auraRotSpeed = dbl(p, "auraRotSpeed", 40.0);
@@ -182,6 +205,12 @@ public final class StorageFinderConfig {
             p.setProperty("alColorMode", Integer.toString(alColorMode));
             p.setProperty("alSort", Integer.toString(alSort));
             p.setProperty("accent", Integer.toString(accent));
+            p.setProperty("zoomFov", Integer.toString(zoomFov));
+            p.setProperty("infoEnabled", Boolean.toString(infoEnabled));
+            p.setProperty("infoCoords", Boolean.toString(infoCoords));
+            p.setProperty("infoFps", Boolean.toString(infoFps));
+            p.setProperty("infoDir", Boolean.toString(infoDir));
+            p.setProperty("favorites", String.join(",", favorites));
 
             p.setProperty("freecamSpeed", Double.toString(freecamSpeed));
             p.setProperty("auraRange", Double.toString(auraRange));
@@ -190,6 +219,7 @@ public final class StorageFinderConfig {
             p.setProperty("auraCooldown", Boolean.toString(auraCooldown));
             p.setProperty("auraWalls", Boolean.toString(auraWalls));
             p.setProperty("auraRotate", Boolean.toString(auraRotate));
+            p.setProperty("auraHitMode", Integer.toString(auraHitMode));
             p.setProperty("auraSilent", Boolean.toString(auraSilent));
             p.setProperty("auraRandomDelay", Boolean.toString(auraRandomDelay));
             p.setProperty("auraRotSpeed", Double.toString(auraRotSpeed));
