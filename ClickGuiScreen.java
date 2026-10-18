@@ -6,33 +6,53 @@ import java.util.List;
 import com.mojang.blaze3d.platform.InputConstants;
 
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FormattedCharSequence;
 
 /**
- * Click GUI w stylu Krukx: jedno okno, pasek kategorii po lewej, siatka modułów 2 kolumny,
- * strona ustawień modułu. LPM = włącz/wyłącz, PPM = ustawienia, ŚPM = bind.
+ * Click GUI (styl "Ventura"): ciemny panel, pasek boczny z kategoriami, karty modułów w dwóch kolumnach
+ * z ustawieniami w środku, gwiazdki ulubionych, menu prawego przycisku (New bind / Reset).
  */
 public class ClickGuiScreen extends Screen {
-    private static final int WIN = 0xFF1D212C, SIDE = 0xFF181B25, CARD = 0xFF292E3B, CARD_H = 0xFF30364A,
-            BAR_OFF = 0xFF3B4151, LINE = 0xFF2C3140, TEXT = 0xFFE9EBF1, SUB = 0xFF9298A9, VEIL = 0x8005070C;
-    private static final int SW = 26, HEAD = 22, CARD_HT = 26, GAP = 5;
-    private static final int ROW_BOOL = 20, ROW_SLIDER = 28, ROW_MODE = 22, ROW_SWATCH = 22, ROW_COLOR = 52;
+    private static final int WINBG = 0xFF111114, SIDEBG = 0xFF131316, BORDER = 0xFF26262B, CARDBG = 0xFF16161A,
+            FIELD = 0xFF202025, TEXT = 0xFFF0F0F5, MUT = 0xFF8A8A94, DIM = 0xFF55555E, TAGBG = 0xFF1F1F24,
+            TRACK = 0xFF2A2A30, SELBG = 0xFF1D1D22, HOVBG = 0xFF18181C, VEIL = 0x70000000, PINK = 0xFFF08CA0;
 
-    private static final String[] NAV_IDS = {"Home", "Combat", "Render", "HUD"};
-    private static final String[][] ICONS = {
-            {"....#....", "...###...", "..#####..", ".#######.", "#########", ".##...##.", ".##...##.", ".##.#.##.", ".##.#.##."},
-            {".......##", "......###", ".....###.", "....###..", "#..###...", ".####....", "..##.....", ".#.##....", "#...#...."},
-            {".........", "...###...", ".##...##.", "#..###..#", "#.##.##.#", "#..###..#", ".##...##.", "...###...", "........."},
-            {"#########", "#.......#", "#########", "#..#....#", "#..#....#", "#..#....#", "#..#....#", "#..#....#", "#########"}
+    private static final int SB = 108, HEAD = 26, GAPC = 8;
+    private static final int HEAD_H = 20, TAG_H = 18, PAD_TOP = 4, PAD_BOT = 4;
+    private static final int R_BOOL = 16, R_MODE = 30, R_SLIDER = 22, R_COLOR = 44, R_SWATCH = 26, R_BIND = 16;
+
+    // ---- ikony 9x9 / 7x7 (piksele) ----
+    private static final String[] I_COMBAT = {".......##", "......###", ".....###.", "....###..", "#..###...", ".####....", "..##.....", ".#.##....", "#...#...."};
+    private static final String[] I_MOVE = {"......###", ".....####", "....####.", "...####..", "..####...", ".####....", "####.....", "#.##.....", "#........"};
+    private static final String[] I_MISC = {".#.#.#.#.", "#########", ".#.....#.", "##.###.##", ".#.###.#.", "##.###.##", ".#.....#.", "#########", ".#.#.#.#."};
+    private static final String[] I_RENDER = {"#########", "#.......#", "#.##....#", "#.##....#", "#.......#", "#...#...#", "#..###..#", "#.#####.#", "#########"};
+    private static final String[] I_STAR = {"....#....", "....#....", "...###...", "#########", ".#######.", "..#####..", "..##.##..", ".##...##.", "#.......#"};
+    private static final String[] I_SEARCH = {".###...", "#...#..", "#...#..", "#...#..", ".###...", "....##.", ".....##"};
+    private static final String[] I_TOGGLE = {".#####.", "#######", "####..#", "#######", ".#####."};
+    private static final String[] I_SLIDER = {"#######", "..#....", ".......", "#######", "....#.."};
+    private static final String[] I_LIST = {"#######", "#.....#", "#.###.#", "#.....#", "#.###.#", "#.....#", "#######"};
+    private static final String[] I_KEY = {".###...", "#...#..", "#...#..", ".###...", "..#....", "..##...", "..#...."};
+    private static final String[] I_COLOR = {".#####.", "#.....#", "#.###.#", "#.###.#", "#.###.#", "#.....#", ".#####."};
+    private static final String[] I_PLUS = {"..#..", "..#..", "#####", "..#..", "..#.."};
+    private static final String[] I_RESET = {".###.", "#...#", "#....", "#...#", ".###."};
+
+    private record Nav(String id, String label, String[] icon, int section) {}
+
+    private static final Nav[] NAVS = {
+            new Nav("Combat", "Combat", I_COMBAT, 0),
+            new Nav("Movement", "Movement", I_MOVE, 0),
+            new Nav("Misc", "Misc", I_MISC, 0),
+            new Nav("Render", "Render", I_RENDER, 0),
+            new Nav("Favorites", "Favorites", I_STAR, 1)
     };
 
-    private enum Kind { NAV, CLOSE, BACK, CARD, ENABLED, BOOL, SLIDER, CHANNEL, MODE, SWATCH, BIND }
+    private enum Kind { NAV, HEAD, TOGGLE, STAR, BOOL, SLIDER, CHANNEL, DROPDOWN, DD_OPT, SWATCH, BIND, CTX_BIND, CTX_RESET }
 
     private record Hit(Kind kind, int x, int y, int w, int h, boolean body, Module mod, Setting setting, int idx) {
         boolean inside(double mx, double my) {
@@ -41,19 +61,23 @@ public class ClickGuiScreen extends Screen {
     }
 
     private final List<Hit> hits = new ArrayList<>();
+    private List<Nav> navList = new ArrayList<>(List.of(NAVS));
     private EditBox search;
 
-    private int cat = 0;                // indeks w NAV_IDS
-    private Module mod = null;          // != null => strona ustawień
+    private int cat = 0;
     private Module binding = null;
     private Hit dragHit = null;
+
+    private Module ctxModule = null;
+    private int ctxX, ctxY;
+    private Setting.Mode ddSetting = null;
+    private int ddX, ddY, ddW;
 
     private float scroll = 0, scrollTarget = 0, maxScroll = 0;
     private float openT = 0, pageT = 1;
     private long lastNanos = 0;
     private float A = 1f;
 
-    // layout
     private int wx, wy, ww, wh, bx, by, bw, bh;
 
     public ClickGuiScreen() {
@@ -87,31 +111,52 @@ public class ClickGuiScreen extends Screen {
 
     private void rr(GuiGraphics g, int x, int y, int w, int h, int r, int col) { Ui.rrect(g, x, y, w, h, r, c(col)); }
 
+    /** Ramka 1px + wypełnienie (zaokrąglone). */
+    private void box(GuiGraphics g, int x, int y, int w, int h, int r, int fillCol, int borderCol) {
+        rr(g, x - 1, y - 1, w + 2, h + 2, r + 1, borderCol);
+        rr(g, x, y, w, h, r, fillCol);
+    }
+
     private void txt(GuiGraphics g, String s, int x, int y, int col) { g.drawString(this.font, s, x, y, c(col)); }
 
     private void txtR(GuiGraphics g, String s, int xr, int y, int col) {
         g.drawString(this.font, s, xr - this.font.width(s), y, c(col));
     }
 
-    private String fit(String s, int maxW) {
-        if (this.font.width(s) <= maxW) return s;
-        return this.font.plainSubstrByWidth(s, Math.max(0, maxW - this.font.width("..."))) + "...";
+    private void icon(GuiGraphics g, String[] rows, int x, int y, int col) {
+        for (int r = 0; r < rows.length; r++) {
+            String row = rows[r];
+            for (int cc = 0; cc < row.length(); cc++) {
+                if (row.charAt(cc) == '#') fill(g, x + cc, y + r, x + cc + 1, y + r + 1, col);
+            }
+        }
+    }
+
+    private static String[] iconFor(String category) {
+        return switch (category) {
+            case "Combat" -> I_COMBAT;
+            case "Movement" -> I_MOVE;
+            case "Misc" -> I_MISC;
+            default -> I_RENDER;
+        };
     }
 
     private void startPage() {
         pageT = 0;
         scroll = 0;
         scrollTarget = 0;
+        ctxModule = null;
+        ddSetting = null;
     }
 
     private void layout(int oy) {
-        ww = Math.min(440, this.width - 16);
-        wh = Math.min(268, this.height - 16);
+        ww = Math.min(480, this.width - 20);
+        wh = Math.min(290, this.height - 20);
         wx = (this.width - ww) / 2;
         wy = (this.height - wh) / 2 + oy;
-        bx = wx + SW + 8;
+        bx = wx + SB + 8;
         by = wy + HEAD + 8;
-        bw = ww - SW - 16;
+        bw = ww - SB - 16 - 4;
         bh = wh - HEAD - 16;
     }
 
@@ -124,26 +169,57 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     protected void init() {
+        navList = new ArrayList<>(List.of(NAVS));
+        navList.add(new Nav("License", "License", I_KEY, 1));
+        if (Krux.isDev()) navList.add(new Nav("Developer", "Developer", I_MISC, 1));
         layout(0);
-        int closeX = wx + ww - 6 - 14;
-        int sbx = closeX - 5 - 110;
-        search = new EditBox(this.font, sbx + 17, wy + 4, 110 - 21, 14, Component.literal("Search"));
+        int btnX = wx + ww - 8 - 16;
+        int sbx = btnX - 6 - 124;
+        search = new EditBox(this.font, sbx + 18, wy + 5, 124 - 24, 16, Component.literal("Search"));
         search.setBordered(false);
         search.setTextColor(TEXT);
-        search.setHint(Component.literal("Type to search"));
-        search.setResponder(s -> {
-            if (!s.isEmpty()) mod = null;
-            startPage();
-        });
+        search.setHint(Component.literal("Search modules..."));
+        search.setResponder(s -> startPage());
         addWidget(search);
 
-        for (Module m : Modules.ALL) {
-            m.onAnim = m.isEnabled() ? 1f : 0f;
-            m.hoverAnim = 0f;
-        }
+        for (Module m : Modules.ALL) m.onAnim = m.isEnabled() ? 1f : 0f;
         lastNanos = 0;
         openT = 0;
         pageT = 1;
+    }
+
+    // ------------------------------------------------------------------ module list + card sizes
+
+    private List<Module> visibleModules() {
+        String term = search.getValue().trim().toLowerCase();
+        List<Module> out = new ArrayList<>();
+        for (Module m : Modules.ALL) {
+            if (!term.isEmpty()) {
+                boolean tag = false;
+                for (String t : m.tags) if (t.toLowerCase().contains(term)) tag = true;
+                if (tag || m.name.toLowerCase().contains(term)) out.add(m);
+            } else if (navList.get(cat).id().equals("Favorites")) {
+                if (StorageFinderConfig.favorites.contains(m.name)) out.add(m);
+            } else if (m.category.equals(navList.get(cat).id())) {
+                out.add(m);
+            }
+        }
+        return out;
+    }
+
+    private static int settingHeight(Setting s) {
+        if (s instanceof Setting.Slider) return R_SLIDER;
+        if (s instanceof Setting.Mode) return R_MODE;
+        if (s instanceof Setting.ColorPick) return R_COLOR;
+        if (s instanceof Setting.Swatches) return R_SWATCH;
+        return R_BOOL;
+    }
+
+    private static int cardHeight(Module m) {
+        int h = HEAD_H + (m.tags.length > 0 ? TAG_H : 0) + 1 + PAD_TOP;
+        for (Setting s : m.settings) h += settingHeight(s);
+        h += R_BIND + PAD_BOT;
+        return h;
     }
 
     // ------------------------------------------------------------------ render
@@ -173,288 +249,292 @@ public class ClickGuiScreen extends Screen {
         drawChrome(g, mx, my);
         drawSearch(g, mx, my, partialTick);
 
-        // ---- treść (przewijana, z fade'em przy zmianie strony) ----
+        // ---- treść ----
         float pe = ease(pageT);
         A = ge * pe;
         int yOff = Math.round((1f - pe) * 4f);
-        g.enableScissor(bx - 2, by, bx + bw + 2, by + bh);
-        int contentH = (mod != null) ? drawSettings(g, mx, my, yOff, k) : drawGrid(g, mx, my, yOff, k);
+        g.enableScissor(bx - 2, by, bx + bw + 6, by + bh);
+        int contentH = drawBody(g, mx, my, yOff);
         g.disableScissor();
         maxScroll = Math.max(0, contentH - bh);
         if (scrollTarget > maxScroll) scrollTarget = maxScroll;
 
         A = ge;
-        // pasek przewijania
         if (maxScroll > 0) {
-            int trackH = bh;
-            int thumbH = Math.max(14, Math.round(trackH * (bh / (float) contentH)));
-            int thumbY = by + Math.round((trackH - thumbH) * (scroll / maxScroll));
-            rr(g, wx + ww - 5, thumbY, 2, thumbH, 1, BAR_OFF);
+            int thumbH = Math.max(14, Math.round(bh * (bh / (float) contentH)));
+            int thumbY = by + Math.round((bh - thumbH) * (scroll / maxScroll));
+            rr(g, wx + ww - 6, thumbY, 2, thumbH, 1, TRACK);
         }
+
+        drawPopups(g, mx, my);
     }
 
     private void drawChrome(GuiGraphics g, int mx, int my) {
-        rr(g, wx - 1, wy - 1, ww + 2, wh + 2, 6, LINE);
-        rr(g, wx, wy, ww, wh, 5, WIN);
+        box(g, wx, wy, ww, wh, 6, WINBG, BORDER);
 
         // pasek boczny
-        rr(g, wx, wy, SW, wh, 5, SIDE);
-        fill(g, wx + 5, wy, wx + SW, wy + wh, SIDE);
-        fill(g, wx + SW - 1, wy, wx + SW, wy + wh, LINE);
+        rr(g, wx, wy, SB, wh, 6, SIDEBG);
+        fill(g, wx + 6, wy, wx + SB, wy + wh, SIDEBG);
+        fill(g, wx + SB, wy, wx + SB + 1, wy + wh, BORDER);
+        fill(g, wx, wy + HEAD, wx + SB, wy + HEAD + 1, BORDER);
+        fill(g, wx + SB + 1, wy + HEAD, wx + ww, wy + HEAD + 1, BORDER);
 
-        int ny = wy + 8;
-        for (int i = 0; i < NAV_IDS.length; i++) {
-            if (i == 1) {
-                fill(g, wx + 8, ny + 1, wx + SW - 9, ny + 2, LINE);
-                ny += 6;
+        // logo + nazwa
+        rr(g, wx + 8, wy + 5, 16, 16, 4, accent());
+        txt(g, "K", wx + 8 + 8 - this.font.width("K") / 2, wy + 9, 0xFFFFFFFF);
+        txt(g, Krux.NAME, wx + 30, wy + 9, TEXT);
+
+        // pozycje paska bocznego
+        int y = wy + HEAD + 8;
+        int lastSection = -1;
+        for (int i = 0; i < navList.size(); i++) {
+            Nav n = navList.get(i);
+            if (n.section() != lastSection) {
+                lastSection = n.section();
+                if (i != 0) y += 6;
+                txt(g, n.section() == 0 ? "MAIN" : "OTHER", wx + 12, y, DIM);
+                y += 12;
             }
-            boolean sel = i == cat;
-            boolean hover = mx >= wx + 4 && mx < wx + 4 + 18 && my >= ny && my < ny + 18;
-            if (sel) rr(g, wx + 4, ny, 18, 18, 3, accent());
-            else if (hover) rr(g, wx + 4, ny, 18, 18, 3, CARD);
-            drawIcon(g, ICONS[i], wx + 4 + 4, ny + 4, sel ? 0xFFFFFFFF : (hover ? TEXT : SUB));
-            hits.add(new Hit(Kind.NAV, wx + 4, ny, 18, 18, false, null, null, i));
-            ny += 22;
+            boolean sel = i == cat && search.getValue().trim().isEmpty();
+            boolean hover = mx >= wx + 6 && mx < wx + SB - 6 && my >= y && my < y + 18;
+            if (sel) box(g, wx + 6, y, SB - 12, 18, 4, SELBG, BORDER);
+            else if (hover) rr(g, wx + 6, y, SB - 12, 18, 4, HOVBG);
+            icon(g, n.icon(), wx + 13, y + 4, sel ? accent() : MUT);
+            txt(g, n.label(), wx + 27, y + 5, sel ? TEXT : MUT);
+            if (sel) {
+                for (int dx = 0; dx < 2; dx++) for (int dy = 0; dy < 3; dy++) {
+                    fill(g, wx + SB - 6 - 11 + dx * 4, y + 4 + dy * 4, wx + SB - 6 - 11 + dx * 4 + 2, y + 4 + dy * 4 + 2, accent());
+                }
+            }
+            hits.add(new Hit(Kind.NAV, wx + 6, y, SB - 12, 18, false, null, null, i));
+            y += 20;
         }
 
-        // nagłówek
-        fill(g, wx + SW, wy + HEAD, wx + ww, wy + HEAD + 1, LINE);
+        // stopka z nazwą gracza
+        int fy = wy + wh - 28;
+        fill(g, wx, fy, wx + SB, fy + 1, BORDER);
+        rr(g, wx + 8, fy + 6, 16, 16, 4, 0xFF0B0B0D);
+        txt(g, "K", wx + 8 + 8 - this.font.width("K") / 2, fy + 10, accent());
+        String name = Minecraft.getInstance().getUser().getName();
+        if (this.font.width(name) > SB - 52) name = this.font.plainSubstrByWidth(name, SB - 52);
+        txt(g, name, wx + 30, fy + 6, TEXT);
+        txt(g, Krux.shortStatus(), wx + 30, fy + 16, Krux.licensed() ? MUT : PINK);
 
-        int cx = wx + SW + 10, cy = wy + 7;
-        String catName = NAV_IDS[cat];
+        // nagłówek: ścieżka
+        int cx = wx + SB + 12;
         String term = search.getValue().trim();
-        if (mod != null) {
-            int w = this.font.width(catName);
-            boolean hv = mx >= cx && mx < cx + w && my >= wy && my < wy + HEAD;
-            txt(g, catName, cx, cy, hv ? accent() : TEXT);
-            hits.add(new Hit(Kind.BACK, cx, wy, w, HEAD, false, null, null, 0));
-            fill(g, cx + w + 6, cy - 1, cx + w + 7, cy + 9, SUB);
-            txt(g, mod.name, cx + w + 12, cy, SUB);
+        if (term.isEmpty()) {
+            icon(g, navList.get(cat).icon(), cx, wy + 9, accent());
+            txt(g, navList.get(cat).label(), cx + 14, wy + 9, TEXT);
         } else {
-            txt(g, catName, cx, cy, TEXT);
-            int w = this.font.width(catName);
-            fill(g, cx + w + 6, cy - 1, cx + w + 7, cy + 9, SUB);
-            if (!term.isEmpty()) txt(g, "Search", cx + w + 12, cy, SUB);
-        }
-
-        // przycisk zamknięcia
-        int closeX = wx + ww - 6 - 14, closeY = wy + 4;
-        boolean ch = mx >= closeX && mx < closeX + 14 && my >= closeY && my < closeY + 14;
-        rr(g, closeX, closeY, 14, 14, 3, LINE);
-        rr(g, closeX + 1, closeY + 1, 12, 12, 3, ch ? CARD_H : CARD);
-        int xc = ch ? TEXT : SUB;
-        for (int i = 0; i < 6; i++) {
-            fill(g, closeX + 4 + i, closeY + 4 + i, closeX + 5 + i, closeY + 5 + i, xc);
-            fill(g, closeX + 9 - i, closeY + 4 + i, closeX + 10 - i, closeY + 5 + i, xc);
-        }
-        hits.add(new Hit(Kind.CLOSE, closeX, closeY, 14, 14, false, null, null, 0));
-    }
-
-    private void drawIcon(GuiGraphics g, String[] rows, int x, int y, int col) {
-        for (int r = 0; r < rows.length; r++) {
-            String row = rows[r];
-            for (int cc = 0; cc < row.length(); cc++) {
-                if (row.charAt(cc) == '#') fill(g, x + cc, y + r, x + cc + 1, y + r + 1, col);
-            }
+            icon(g, I_SEARCH, cx, wy + 10, accent());
+            txt(g, "Search results", cx + 14, wy + 9, TEXT);
         }
     }
 
     private void drawSearch(GuiGraphics g, int mx, int my, float pt) {
-        int closeX = wx + ww - 6 - 14;
-        int sbx = closeX - 5 - 110, sby = wy + 4;
+        int btnX = wx + ww - 8 - 16;
+        int sbx = btnX - 6 - 124, sby = wy + 5;
         boolean focus = search.isFocused();
-        rr(g, sbx, sby, 110, 14, 3, focus ? accent() : LINE);
-        rr(g, sbx + 1, sby + 1, 108, 12, 3, CARD);
-        // lupa
-        int lx = sbx + 5, ly = sby + 4;
-        int lc = SUB;
-        fill(g, lx + 1, ly, lx + 4, ly + 1, lc);
-        fill(g, lx + 1, ly + 4, lx + 4, ly + 5, lc);
-        fill(g, lx, ly + 1, lx + 1, ly + 4, lc);
-        fill(g, lx + 4, ly + 1, lx + 5, ly + 4, lc);
-        fill(g, lx + 5, ly + 5, lx + 7, ly + 7, lc);
+        box(g, sbx, sby, 124, 16, 4, FIELD, focus ? accent() : BORDER);
+        icon(g, I_SEARCH, sbx + 6, sby + 4, MUT);
 
-        search.setX(sbx + 17);
-        search.setY(sby);
+        box(g, btnX, sby, 16, 16, 5, FIELD, BORDER);
+        icon(g, I_SEARCH, btnX + 4, sby + 4, TEXT);
+
+        search.setX(sbx + 18);
+        search.setY(sby + (16 - 8) / 2 - 3);
         search.render(g, mx, my, pt);
     }
 
-    // ------------------------------------------------------------------ grid
+    // ------------------------------------------------------------------ body (cards, masonry)
 
-    private List<Module> visibleModules() {
-        String term = search.getValue().trim().toLowerCase();
-        List<Module> out = new ArrayList<>();
-        for (Module m : Modules.ALL) {
-            if (!term.isEmpty()) {
-                if (m.name.toLowerCase().contains(term) || m.desc.toLowerCase().contains(term)) out.add(m);
-            } else if (cat == 0 || m.category.equals(NAV_IDS[cat])) {
-                out.add(m);
-            }
-        }
-        return out;
+    private void toggleSwitch(GuiGraphics g, int x, int y, float t) {
+        rr(g, x, y, 22, 12, 6, lerp(TRACK, accent(), t));
+        rr(g, x + 2 + Math.round(10 * t), y + 2, 8, 8, 4, 0xFFFFFFFF);
     }
 
-    private int drawGrid(GuiGraphics g, int mx, int my, int yOff, float k) {
+    private int drawBody(GuiGraphics g, int mx, int my, int yOff) {
         List<Module> mods = visibleModules();
         int top = by - Math.round(scroll) + yOff;
 
         if (mods.isEmpty()) {
-            txt(g, "No modules match \"" + search.getValue().trim() + "\".", bx, top + 4, SUB);
-            return 20;
+            String msg = navList.get(cat).id().equals("Favorites") && search.getValue().trim().isEmpty()
+                    ? "No favorites yet. Click the star on a module."
+                    : "No modules found.";
+            txt(g, msg, bx + 4, top + 6, MUT);
+            return 24;
         }
 
-        int colW = (bw - GAP) / 2;
+        int colW = (bw - GAPC) / 2;
+        int[] colH = {0, 0};
         boolean inView = mx >= bx && mx < bx + bw && my >= by && my < by + bh;
 
-        for (int i = 0; i < mods.size(); i++) {
-            Module m = mods.get(i);
-            int cx = bx + (i % 2) * (colW + GAP);
-            int cy = top + (i / 2) * (CARD_HT + GAP);
-            if (cy + CARD_HT < by - 2 || cy > by + bh + 2) continue;
-
-            boolean hover = inView && mx >= cx && mx < cx + colW && my >= cy && my < cy + CARD_HT;
-            m.hoverAnim = approach(m.hoverAnim, hover ? 1f : 0f, k);
-
-            rr(g, cx, cy, colW, CARD_HT, 3, lerp(CARD, CARD_H, m.hoverAnim));
-            rr(g, cx + colW - 5, cy, 5, CARD_HT, 2, lerp(BAR_OFF, accent(), m.onAnim));
-
-            txt(g, m.name, cx + 7, cy + 5, lerp(TEXT, accent(), m.onAnim));
-            txt(g, fit(m.desc, colW - 7 - 11), cx + 7, cy + 15, lerp(SUB, accent(), m.onAnim * 0.8f));
-
-            hits.add(new Hit(Kind.CARD, cx, cy, colW, CARD_HT, true, m, null, 0));
+        for (Module m : mods) {
+            int col = colH[0] <= colH[1] ? 0 : 1;
+            int cx = bx + col * (colW + GAPC);
+            int cy = top + colH[col];
+            int ch = cardHeight(m);
+            if (cy + ch >= by - 4 && cy <= by + bh + 4) drawCard(g, m, cx, cy, colW, ch, mx, my, inView);
+            colH[col] += ch + GAPC;
         }
-        int rows = (mods.size() + 1) / 2;
-        return rows * (CARD_HT + GAP) - GAP;
+        return Math.max(colH[0], colH[1]) - GAPC;
     }
 
-    // ------------------------------------------------------------------ settings page
+    private void drawCard(GuiGraphics g, Module m, int x, int y, int cw, int ch, int mx, int my, boolean inView) {
+        box(g, x, y, cw, ch, 5, CARDBG, BORDER);
 
-    private void toggleSwitch(GuiGraphics g, int x, int y, boolean on) {
-        rr(g, x, y, 22, 12, 6, on ? accent() : BAR_OFF);
-        rr(g, on ? x + 12 : x + 2, y + 2, 8, 8, 4, on ? 0xFFFFFFFF : 0xFFC9CDD8);
+        // nagłówek karty
+        icon(g, iconFor(m.category), x + 7, y + 6, accent());
+        txt(g, m.name, x + 19 + 4 + 0, y + 6, TEXT);
+        int swX = x + cw - 7 - 22;
+        int starX = swX - 14;
+        boolean fav = StorageFinderConfig.favorites.contains(m.name);
+        icon(g, I_STAR, starX, y + 6, fav ? accent() : DIM);
+        toggleSwitch(g, swX, y + 4, m.onAnim);
+        hits.add(new Hit(Kind.HEAD, x, y, cw - 40, HEAD_H, true, m, null, 0));
+        hits.add(new Hit(Kind.STAR, starX - 2, y + 3, 13, 14, true, m, null, 0));
+        hits.add(new Hit(Kind.TOGGLE, swX, y + 4, 22, 12, true, m, null, 0));
+
+        int yy = y + HEAD_H;
+        if (m.tags.length > 0) {
+            int tx = x + 7;
+            for (String tag : m.tags) {
+                int w = this.font.width(tag) + 10;
+                rr(g, tx, yy + 1, w, 13, 4, TAGBG);
+                txt(g, tag, tx + 5, yy + 3, MUT);
+                tx += w + 4;
+            }
+            yy += TAG_H;
+        }
+        fill(g, x, yy, x + cw, yy + 1, BORDER);
+        yy += 1 + PAD_TOP;
+
+        for (Setting s : m.settings) {
+            if (s instanceof Setting.Bool b) drawBool(g, m, b, x, yy, cw);
+            else if (s instanceof Setting.Slider sl) drawSlider(g, m, sl, x, yy, cw);
+            else if (s instanceof Setting.Mode md) drawMode(g, m, md, x, yy, cw);
+            else if (s instanceof Setting.Swatches sw) drawSwatches(g, m, sw, x, yy, cw);
+            else if (s instanceof Setting.ColorPick cp) drawColor(g, m, cp, x, yy, cw);
+            yy += settingHeight(s);
+        }
+
+        // Activation Key
+        icon(g, I_KEY, x + 8, yy + 4, accent());
+        txt(g, "Activation Key", x + 19 + 4, yy + 4, TEXT);
+        boolean wait = binding == m;
+        String kt = wait ? "Press a key..." : keyText(m);
+        txtR(g, kt, x + cw - 7, yy + 4, wait ? accent() : MUT);
+        hits.add(new Hit(Kind.BIND, x, yy, cw, R_BIND, true, m, null, 0));
     }
 
-    private int drawSettings(GuiGraphics g, int mx, int my, int yOff, float k) {
-        int y = by - Math.round(scroll) + yOff;
-        int start = y;
-
-        // opis
-        List<FormattedCharSequence> lines = this.font.split(Component.literal(mod.desc), bw);
-        for (FormattedCharSequence line : lines) {
-            g.drawString(this.font, line, bx, y, c(SUB));
-            y += 10;
-        }
-        y += 4;
-
-        // Enabled
-        rr(g, bx, y, bw, ROW_BOOL, 3, CARD);
-        txt(g, "Enabled", bx + 7, y + 6, TEXT);
-        toggleSwitch(g, bx + bw - 7 - 22, y + 4, mod.isEnabled());
-        hits.add(new Hit(Kind.ENABLED, bx, y, bw, ROW_BOOL, true, mod, null, 0));
-        y += ROW_BOOL + 4;
-
-        for (Setting s : mod.settings) {
-            if (s instanceof Setting.Bool b) y = drawBool(g, b, y);
-            else if (s instanceof Setting.Slider sl) y = drawSlider(g, sl, y);
-            else if (s instanceof Setting.Mode md) y = drawMode(g, md, y);
-            else if (s instanceof Setting.Swatches sw) y = drawSwatches(g, sw, y);
-            else if (s instanceof Setting.ColorPick cp) y = drawColor(g, cp, y);
-        }
-
-        // Keybind
-        rr(g, bx, y, bw, ROW_BOOL, 3, CARD);
-        txt(g, "Keybind", bx + 7, y + 6, TEXT);
-        boolean wait = binding == mod;
-        String kt = wait ? "Press a key" : keyText(mod);
-        int btnW = Math.max(40, this.font.width(kt) + 14);
-        int btnX = bx + bw - 7 - btnW;
-        rr(g, btnX, y + 3, btnW, 14, 3, SIDE);
-        txt(g, kt, btnX + (btnW - this.font.width(kt)) / 2, y + 6, wait ? accent() : TEXT);
-        hits.add(new Hit(Kind.BIND, btnX, y + 3, btnW, 14, true, mod, null, 0));
-        y += ROW_BOOL + 4;
-
-        return (y - start) - 4;
-    }
-
-    private int drawBool(GuiGraphics g, Setting.Bool b, int y) {
-        rr(g, bx, y, bw, ROW_BOOL, 3, CARD);
-        int lx = bx + 7;
+    private void drawBool(GuiGraphics g, Module m, Setting.Bool b, int x, int y, int cw) {
+        icon(g, I_TOGGLE, x + 8, y + 5, accent());
+        int lx = x + 19 + 4;
         if (b.color != 0) {
-            rr(g, lx, y + 7, 6, 6, 2, b.color);
-            lx += 11;
+            rr(g, lx, y + 5, 6, 6, 2, b.color);
+            lx += 10;
         }
-        txt(g, b.name, lx, y + 6, TEXT);
-        toggleSwitch(g, bx + bw - 7 - 22, y + 4, b.get());
-        hits.add(new Hit(Kind.BOOL, bx, y, bw, ROW_BOOL, true, mod, b, 0));
-        return y + ROW_BOOL + 4;
+        txt(g, b.name, lx, y + 4, TEXT);
+        toggleSwitch(g, x + cw - 7 - 22, y + 2, b.get() ? 1f : 0f);
+        hits.add(new Hit(Kind.BOOL, x, y, cw, R_BOOL, true, m, b, 0));
     }
 
-    private void track(GuiGraphics g, int x, int y, int w, double frac, int fillCol) {
-        rr(g, x, y, w, 3, 1, BAR_OFF);
+    private void track(GuiGraphics g, int x, int y, int w, double frac) {
+        rr(g, x, y, w, 3, 1, TRACK);
         int fw = (int) Math.round(w * Math.max(0, Math.min(1, frac)));
-        if (fw > 0) rr(g, x, y, Math.max(2, fw), 3, 1, fillCol);
-        rr(g, x + fw - 4, y - 3, 8, 8, 4, 0xFFFFFFFF);
+        if (fw > 0) rr(g, x, y, Math.max(2, fw), 3, 1, accent());
+        rr(g, x + fw - 3, y - 2, 7, 7, 3, 0xFFFFFFFF);
     }
 
-    private int drawSlider(GuiGraphics g, Setting.Slider sl, int y) {
-        rr(g, bx, y, bw, ROW_SLIDER, 3, CARD);
-        txt(g, sl.name, bx + 7, y + 5, TEXT);
-        txtR(g, sl.display(), bx + bw - 7, y + 5, SUB);
-        int tx = bx + 11, tw = bw - 22;
-        track(g, tx, y + 19, tw, (sl.get() - sl.min) / (sl.max - sl.min), accent());
-        hits.add(new Hit(Kind.SLIDER, tx, y + 13, tw, 12, true, mod, sl, 0));
-        return y + ROW_SLIDER + 4;
+    private void drawSlider(GuiGraphics g, Module m, Setting.Slider sl, int x, int y, int cw) {
+        icon(g, I_SLIDER, x + 8, y + 2, accent());
+        txt(g, sl.name, x + 19 + 4, y + 2, TEXT);
+        txtR(g, sl.display(), x + cw - 7, y + 2, TEXT);
+        int tx = x + 8, tw = cw - 16;
+        track(g, tx, y + 15, tw, (sl.get() - sl.min) / (sl.max - sl.min));
+        hits.add(new Hit(Kind.SLIDER, tx, y + 11, tw, 11, true, m, sl, 0));
     }
 
-    private int drawMode(GuiGraphics g, Setting.Mode md, int y) {
-        rr(g, bx, y, bw, ROW_MODE, 3, CARD);
-        txt(g, md.name, bx + 7, y + 7, TEXT);
-        int total = 0;
-        for (String o : md.options) total += this.font.width(o) + 10 + 3;
-        total -= 3;
-        int cx = bx + bw - 7 - total;
-        int sel = md.get();
-        for (int i = 0; i < md.options.length; i++) {
-            int w = this.font.width(md.options[i]) + 10;
-            rr(g, cx, y + 4, w, 14, 3, i == sel ? accent() : SIDE);
-            txt(g, md.options[i], cx + 5, y + 7, i == sel ? 0xFFFFFFFF : SUB);
-            hits.add(new Hit(Kind.MODE, cx, y + 4, w, 14, true, mod, md, i));
-            cx += w + 3;
-        }
-        return y + ROW_MODE + 4;
+    private void drawMode(GuiGraphics g, Module m, Setting.Mode md, int x, int y, int cw) {
+        icon(g, I_LIST, x + 8, y + 2, accent());
+        txt(g, md.name, x + 19 + 4, y + 2, TEXT);
+        int fx = x + 7, fw = cw - 14;
+        box(g, fx, y + 13, fw, 15, 4, FIELD, BORDER);
+        txt(g, md.options[md.get()], fx + 6, y + 17, 0xFFB4B4BE);
+        // strzałka
+        int ax = fx + fw - 12, ay = y + 19;
+        fill(g, ax, ay, ax + 5, ay + 1, MUT);
+        fill(g, ax + 1, ay + 1, ax + 4, ay + 2, MUT);
+        fill(g, ax + 2, ay + 2, ax + 3, ay + 3, MUT);
+        hits.add(new Hit(Kind.DROPDOWN, fx, y + 13, fw, 15, true, m, md, 0));
     }
 
-    private int drawSwatches(GuiGraphics g, Setting.Swatches sw, int y) {
-        rr(g, bx, y, bw, ROW_SWATCH, 3, CARD);
-        txt(g, sw.name, bx + 7, y + 7, TEXT);
-        int n = sw.colors.length;
-        int total = n * 10 + (n - 1) * 5;
-        int cx = bx + bw - 7 - total;
+    private void drawSwatches(GuiGraphics g, Module m, Setting.Swatches sw, int x, int y, int cw) {
+        icon(g, I_COLOR, x + 8, y + 2, accent());
+        txt(g, sw.name, x + 19 + 4, y + 2, TEXT);
         int sel = sw.selected();
-        for (int i = 0; i < n; i++) {
-            if (i == sel) rr(g, cx - 2, y + 4, 14, 14, 4, 0xFFFFFFFF);
-            rr(g, cx, y + 6, 10, 10, 3, 0xFF000000 | sw.colors[i]);
-            hits.add(new Hit(Kind.SWATCH, cx - 2, y + 4, 14, 14, true, mod, sw, i));
-            cx += 15;
+        int cx = x + 8;
+        for (int i = 0; i < sw.colors.length; i++) {
+            if (i == sel) rr(g, cx - 2, y + 11, 14, 14, 4, 0xFFFFFFFF);
+            rr(g, cx, y + 13, 10, 10, 3, 0xFF000000 | sw.colors[i]);
+            hits.add(new Hit(Kind.SWATCH, cx - 2, y + 11, 14, 14, true, m, sw, i));
+            cx += 16;
         }
-        return y + ROW_SWATCH + 4;
     }
 
-    private int drawColor(GuiGraphics g, Setting.ColorPick cp, int y) {
-        rr(g, bx, y, bw, ROW_COLOR, 3, CARD);
+    private void drawColor(GuiGraphics g, Module m, Setting.ColorPick cp, int x, int y, int cw) {
         int rgb = cp.get();
-        txt(g, cp.name, bx + 7, y + 5, TEXT);
-        rr(g, bx + bw - 7 - 22, y + 4, 22, 10, 3, 0xFF000000 | rgb);
-
+        icon(g, I_COLOR, x + 8, y + 2, accent());
+        txt(g, cp.name, x + 19 + 4, y + 2, TEXT);
+        rr(g, x + cw - 7 - 18, y + 1, 18, 9, 3, 0xFF000000 | rgb);
         int[] tint = {0xFFFF5555, 0xFF55FF55, 0xFF5577FF};
-        int tx = bx + 11, tw = bw - 22;
+        int tx = x + 8, tw = cw - 16;
         for (int ch = 0; ch < 3; ch++) {
-            int ty = y + 22 + ch * 10;
+            int ty = y + 16 + ch * 10;
             int val = (rgb >> (16 - 8 * ch)) & 255;
-            track(g, tx, ty, tw, val / 255.0, tint[ch]);
-            hits.add(new Hit(Kind.CHANNEL, tx, ty - 4, tw, 11, true, mod, cp, ch));
+            rr(g, tx, ty, tw, 3, 1, TRACK);
+            int fw = (int) Math.round(tw * (val / 255.0));
+            if (fw > 0) rr(g, tx, ty, Math.max(2, fw), 3, 1, tint[ch]);
+            rr(g, tx + fw - 3, ty - 2, 7, 7, 3, 0xFFFFFFFF);
+            hits.add(new Hit(Kind.CHANNEL, tx, ty - 4, tw, 10, true, m, cp, ch));
         }
-        return y + ROW_COLOR + 4;
+    }
+
+    // ------------------------------------------------------------------ popups
+
+    private void drawPopups(GuiGraphics g, int mx, int my) {
+        A = ease(openT);
+
+        if (ddSetting != null) {
+            int n = ddSetting.options.length;
+            int h = n * 14 + 4;
+            box(g, ddX, ddY, ddW, h, 4, FIELD, BORDER);
+            int sel = ddSetting.get();
+            for (int i = 0; i < n; i++) {
+                int oy = ddY + 2 + i * 14;
+                boolean hv = mx >= ddX && mx < ddX + ddW && my >= oy && my < oy + 14;
+                if (hv) rr(g, ddX + 2, oy, ddW - 4, 14, 3, SELBG);
+                txt(g, ddSetting.options[i], ddX + 8, oy + 3, i == sel ? accent() : (hv ? TEXT : MUT));
+                hits.add(new Hit(Kind.DD_OPT, ddX, oy, ddW, 14, false, null, ddSetting, i));
+            }
+        }
+
+        if (ctxModule != null) {
+            int w = 80, h = 36;
+            int x = Math.min(ctxX, this.width - w - 4), y = Math.min(ctxY, this.height - h - 4);
+            box(g, x, y, w, h, 5, CARDBG, BORDER);
+            boolean h1 = mx >= x && mx < x + w && my >= y + 2 && my < y + 18;
+            boolean h2 = mx >= x && mx < x + w && my >= y + 18 && my < y + 34;
+            if (h1) rr(g, x + 2, y + 2, w - 4, 16, 3, SELBG);
+            if (h2) rr(g, x + 2, y + 18, w - 4, 16, 3, SELBG);
+            icon(g, I_PLUS, x + 8, y + 7, MUT);
+            txt(g, "New bind", x + 20, y + 6, TEXT);
+            icon(g, I_RESET, x + 8, y + 23, PINK);
+            txt(g, "Reset", x + 20, y + 22, PINK);
+            hits.add(new Hit(Kind.CTX_BIND, x, y + 2, w, 16, false, ctxModule, null, 0));
+            hits.add(new Hit(Kind.CTX_RESET, x, y + 18, w, 16, false, ctxModule, null, 0));
+        }
     }
 
     // ------------------------------------------------------------------ input
@@ -497,10 +577,21 @@ public class ClickGuiScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (mouseX >= wx && mouseX < wx + ww && mouseY >= wy && mouseY < wy + wh) {
+            ctxModule = null;
+            ddSetting = null;
             scrollTarget = Math.max(0, Math.min(maxScroll, scrollTarget - (float) scrollY * 18f));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    private boolean popupHitAt(double mx, double my) {
+        for (Hit h : hits) {
+            if ((h.kind() == Kind.DD_OPT || h.kind() == Kind.CTX_BIND || h.kind() == Kind.CTX_RESET) && h.inside(mx, my)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -508,10 +599,17 @@ public class ClickGuiScreen extends Screen {
         double mx = event.x(), my = event.y();
         int btn = event.button();
 
+        // klik poza otwartym popupem tylko go zamyka
+        if ((ctxModule != null || ddSetting != null) && !popupHitAt(mx, my)) {
+            ctxModule = null;
+            ddSetting = null;
+            return true;
+        }
+
         Module wasBinding = binding;
         binding = null;
 
-        boolean inView = mx >= bx && mx < bx + bw && my >= by && my < by + bh;
+        boolean inView = mx >= bx && mx < bx + bw + 6 && my >= by && my < by + bh;
 
         for (int i = hits.size() - 1; i >= 0; i--) {
             Hit h = hits.get(i);
@@ -521,38 +619,38 @@ public class ClickGuiScreen extends Screen {
             switch (h.kind()) {
                 case NAV -> {
                     if (btn == 0) {
-                        cat = h.idx();
-                        mod = null;
-                        search.setValue("");
-                        startPage();
+                        Nav n = navList.get(h.idx());
+                        if (n.id().equals("License")) {
+                            this.minecraft.setScreen(new LicenseScreen(this));
+                        } else if (n.id().equals("Developer")) {
+                            this.minecraft.setScreen(new KruxDevScreen(this));
+                        } else {
+                            cat = h.idx();
+                            search.setValue("");
+                            startPage();
+                        }
                     }
                 }
-                case CLOSE -> {
-                    if (btn == 0) onClose();
-                }
-                case BACK -> {
-                    if (btn == 0) {
-                        mod = null;
-                        startPage();
-                    }
-                }
-                case CARD -> {
-                    Module m = h.mod();
-                    if (btn == 0) {
-                        m.toggle();
-                        StorageFinderConfig.save();
-                    } else if (btn == 1) {
-                        mod = m;
-                        startPage();
-                    } else if (btn == 2) {
-                        mod = m;
-                        startPage();
-                        binding = m;
-                    }
-                }
-                case ENABLED -> {
+                case HEAD -> {
                     if (btn == 0) {
                         h.mod().toggle();
+                        StorageFinderConfig.save();
+                    } else if (btn == 1) {
+                        ctxModule = h.mod();
+                        ctxX = (int) mx;
+                        ctxY = (int) my;
+                    }
+                }
+                case TOGGLE -> {
+                    if (btn == 0) {
+                        h.mod().toggle();
+                        StorageFinderConfig.save();
+                    }
+                }
+                case STAR -> {
+                    if (btn == 0) {
+                        String n = h.mod().name;
+                        if (!StorageFinderConfig.favorites.remove(n)) StorageFinderConfig.favorites.add(n);
                         StorageFinderConfig.save();
                     }
                 }
@@ -563,9 +661,24 @@ public class ClickGuiScreen extends Screen {
                         StorageFinderConfig.save();
                     }
                 }
-                case MODE -> {
+                case SLIDER, CHANNEL -> {
+                    if (btn == 0) {
+                        dragHit = h;
+                        applyDrag(h, mx);
+                    }
+                }
+                case DROPDOWN -> {
+                    if (btn == 0) {
+                        ddSetting = (Setting.Mode) h.setting();
+                        ddX = h.x();
+                        ddY = h.y() + h.h() + 1;
+                        ddW = h.w();
+                    }
+                }
+                case DD_OPT -> {
                     if (btn == 0) {
                         ((Setting.Mode) h.setting()).set(h.idx());
+                        ddSetting = null;
                         StorageFinderConfig.save();
                     }
                 }
@@ -575,14 +688,17 @@ public class ClickGuiScreen extends Screen {
                         StorageFinderConfig.save();
                     }
                 }
-                case SLIDER, CHANNEL -> {
-                    if (btn == 0) {
-                        dragHit = h;
-                        applyDrag(h, mx);
-                    }
-                }
                 case BIND -> {
                     if (btn == 0) binding = (wasBinding == h.mod()) ? null : h.mod();
+                }
+                case CTX_BIND -> {
+                    binding = h.mod();
+                    ctxModule = null;
+                }
+                case CTX_RESET -> {
+                    h.mod().reset();
+                    ctxModule = null;
+                    StorageFinderConfig.save();
                 }
             }
             return true;

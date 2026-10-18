@@ -88,6 +88,7 @@ public final class StorageScanner {
     }
 
     public static void tick(Minecraft mc) {
+        if (!Krux.licensed()) return;
         tickCounter++;
         ClientLevel level = mc.level;
         if (level == null || mc.player == null) {

@@ -14,9 +14,13 @@ public abstract class Setting {
         this.name = name;
     }
 
+    /** Przywraca wartość domyślną (zapamiętaną przy tworzeniu ustawienia). */
+    public abstract void reset();
+
     public static final class Bool extends Setting {
         private final BooleanSupplier getter;
         private final Consumer<Boolean> setter;
+        private final boolean def;
         public final int color;
 
         public Bool(String name, int color, BooleanSupplier getter, Consumer<Boolean> setter) {
@@ -24,10 +28,12 @@ public abstract class Setting {
             this.color = color;
             this.getter = getter;
             this.setter = setter;
+            this.def = getter.getAsBoolean();
         }
 
         public boolean get() { return getter.getAsBoolean(); }
         public void set(boolean v) { setter.accept(v); }
+        @Override public void reset() { setter.accept(def); }
     }
 
     public static final class Slider extends Setting {
@@ -35,6 +41,7 @@ public abstract class Setting {
         public final boolean integer;
         private final DoubleSupplier getter;
         private final DoubleConsumer setter;
+        private final double def;
 
         public Slider(String name, double min, double max, double step, boolean integer,
                       DoubleSupplier getter, DoubleConsumer setter) {
@@ -45,6 +52,7 @@ public abstract class Setting {
             this.integer = integer;
             this.getter = getter;
             this.setter = setter;
+            this.def = getter.getAsDouble();
         }
 
         public double get() { return getter.getAsDouble(); }
@@ -60,38 +68,46 @@ public abstract class Setting {
             return integer ? String.valueOf((int) Math.round(get()))
                     : String.format(java.util.Locale.ROOT, "%.1f", get());
         }
+
+        @Override public void reset() { setter.accept(def); }
     }
 
     /** Wybór koloru RGB (trzy suwaki + podgląd). */
     public static final class ColorPick extends Setting {
         private final IntSupplier getter;
         private final IntConsumer setter;
+        private final int def;
 
         public ColorPick(String name, IntSupplier getter, IntConsumer setter) {
             super(name);
             this.getter = getter;
             this.setter = setter;
+            this.def = getter.getAsInt() & 0xFFFFFF;
         }
 
         public int get() { return getter.getAsInt() & 0xFFFFFF; }
         public void set(int rgb) { setter.accept(rgb & 0xFFFFFF); }
+        @Override public void reset() { setter.accept(def); }
     }
 
-    /** Wybór jednej opcji z listy (chipy). */
+    /** Wybór jednej opcji z listy (rozwijana lista). */
     public static final class Mode extends Setting {
         public final String[] options;
         private final IntSupplier getter;
         private final IntConsumer setter;
+        private final int def;
 
         public Mode(String name, String[] options, IntSupplier getter, IntConsumer setter) {
             super(name);
             this.options = options;
             this.getter = getter;
             this.setter = setter;
+            this.def = getter.getAsInt();
         }
 
         public int get() { return Math.max(0, Math.min(options.length - 1, getter.getAsInt())); }
         public void set(int i) { setter.accept(i); }
+        @Override public void reset() { setter.accept(def); }
     }
 
     /** Wybór koloru z gotowych próbek. */
@@ -100,6 +116,7 @@ public abstract class Setting {
         public final int[] colors;
         private final IntSupplier getter;
         private final IntConsumer setter;
+        private final int def;
 
         public Swatches(String name, String[] names, int[] colors, IntSupplier getter, IntConsumer setter) {
             super(name);
@@ -107,6 +124,7 @@ public abstract class Setting {
             this.colors = colors;
             this.getter = getter;
             this.setter = setter;
+            this.def = getter.getAsInt() & 0xFFFFFF;
         }
 
         public int selected() {
@@ -116,5 +134,6 @@ public abstract class Setting {
         }
 
         public void set(int i) { setter.accept(colors[i] & 0xFFFFFF); }
+        @Override public void reset() { setter.accept(def); }
     }
 }
