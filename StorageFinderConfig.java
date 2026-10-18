@@ -1,3 +1,4 @@
+
 package com.example.storagefinder;
 
 import java.io.InputStream;
@@ -16,7 +17,7 @@ public final class StorageFinderConfig {
     // ---- Storage Finder ----
     public static boolean enabled = false;
     public static final boolean[] types = new boolean[StorageType.values().length];
-    public static boolean tracers = true;          // tracery do bloków
+    public static boolean tracers = true;
     public static int radiusChunks = 8;
 
     // ---- ESP ----
@@ -26,7 +27,7 @@ public final class StorageFinderConfig {
     public static boolean espPassive = false;
     public static int espPlayerColor = 0x3DD6FF;
     public static int espMobColor = 0xFF5555;
-    public static int espOpacity = 50;             // %
+    public static int espOpacity = 50;
 
     // ---- Tracers (gracze / moby) ----
     public static boolean tracersEnabled = false;
@@ -39,8 +40,8 @@ public final class StorageFinderConfig {
     public static boolean arrayList = true;
     public static boolean alBackground = true;
     public static boolean alSuffix = true;
-    public static int alColorMode = 2;             // 0 Static, 1 Rainbow, 2 Gradient
-    public static int alSort = 0;                  // 0 Length, 1 A-Z
+    public static int alColorMode = 2;
+    public static int alSort = 0;
     public static int accent = 0xA78BFA;
 
     // ---- nowe moduły ----
@@ -61,10 +62,10 @@ public final class StorageFinderConfig {
     public static boolean auraCooldown = true;
     public static boolean auraWalls = false;
     public static boolean auraRotate = false;
-    public static int auraHitMode = 3;              // 0 Always, 1 Ground, 2 Crit, 3 Ground / Crit
-    public static boolean auraSilent = true;        // cicha rotacja (kamera się nie obraca)
+    public static int auraHitMode = 3;
+    public static boolean auraSilent = true;
     public static boolean auraRandomDelay = false;
-    public static double auraRotSpeed = 40.0;      // maks. obrót na tick (stopnie)
+    public static double auraRotSpeed = 40.0;
     public static double auraJitter = 0.15;
 
     private static int lastSig = 0;
@@ -88,7 +89,9 @@ public final class StorageFinderConfig {
     }
 
     private static Path file() {
-        return FabricLoader.getInstance().getConfigDir().resolve("storagefinder.properties");
+        return FabricLoader.getInstance()
+                .getConfigDir()
+                .resolve("storagefinder.properties");
     }
 
     private static boolean b(Properties p, String k, boolean d) {
@@ -97,25 +100,42 @@ public final class StorageFinderConfig {
     }
 
     private static double dbl(Properties p, String k, double d) {
-        try { return Double.parseDouble(p.getProperty(k, Double.toString(d))); } catch (Exception e) { return d; }
+        try {
+            return Double.parseDouble(p.getProperty(k, Double.toString(d)));
+        } catch (Exception e) {
+            return d;
+        }
     }
 
     private static int num(Properties p, String k, int d) {
-        try { return Integer.parseInt(p.getProperty(k, Integer.toString(d))); } catch (Exception e) { return d; }
+        try {
+            return Integer.parseInt(p.getProperty(k, Integer.toString(d)));
+        } catch (Exception e) {
+            return d;
+        }
     }
 
     public static void load() {
         try {
             Path f = file();
-            if (!Files.exists(f)) return;
+
+            if (!Files.exists(f)) {
+                lastSig = signature();
+                return;
+            }
+
             Properties p = new Properties();
+
             try (InputStream in = Files.newInputStream(f)) {
                 p.load(in);
             }
+
             enabled = b(p, "enabled", false);
+
             for (StorageType t : StorageType.values()) {
                 types[t.ordinal()] = b(p, "type." + t.name(), true);
             }
+
             tracers = b(p, "tracers", true);
             radiusChunks = Math.max(2, Math.min(16, num(p, "radius", 8)));
 
@@ -139,19 +159,21 @@ public final class StorageFinderConfig {
             alColorMode = Math.max(0, Math.min(2, num(p, "alColorMode", 2)));
             alSort = Math.max(0, Math.min(1, num(p, "alSort", 0)));
             accent = num(p, "accent", 0xA78BFA) & 0xFFFFFF;
+
             zoomFov = Math.max(30, Math.min(90, num(p, "zoomFov", 30)));
             infoEnabled = b(p, "infoEnabled", false);
             infoCoords = b(p, "infoCoords", true);
             infoFps = b(p, "infoFps", true);
             infoDir = b(p, "infoDir", true);
+
             favorites.clear();
-           
-favorites.clear();
-for (String favorite : p.getProperty("favorites", "").split(",")) {
-    if (!favorite.isBlank()) {
-        favorites.add(favorite.trim());
-    }
-}
+
+            // Poprawiona nazwa zmiennej — brak konfliktu z Path f.
+            for (String favorite : p.getProperty("favorites", "").split(",")) {
+                if (!favorite.isBlank()) {
+                    favorites.add(favorite.trim());
+                }
+            }
 
             freecamSpeed = dbl(p, "freecamSpeed", 3.0);
             auraRange = dbl(p, "auraRange", 3.0);
@@ -165,8 +187,12 @@ for (String favorite : p.getProperty("favorites", "").split(",")) {
             auraRandomDelay = b(p, "auraRandomDelay", false);
             auraRotSpeed = dbl(p, "auraRotSpeed", 40.0);
             auraJitter = dbl(p, "auraJitter", 0.15);
-        } catch (Exception ignored) {
+
+        } catch (Exception e) {
+            System.err.println("Nie udało się wczytać konfiguracji Storage Finder: "
+                    + e.getMessage());
         }
+
         lastSig = signature();
     }
 
@@ -176,16 +202,24 @@ for (String favorite : p.getProperty("favorites", "").split(",")) {
 
     public static void save() {
         int sig = signature();
+
         if (sig != lastSig) {
             lastSig = sig;
-            StorageScanner.requestRescan();   // tylko gdy zmieniło się coś ważnego dla skanera
+            StorageScanner.requestRescan();
         }
+
         try {
             Properties p = new Properties();
+
             p.setProperty("enabled", Boolean.toString(enabled));
+
             for (StorageType t : StorageType.values()) {
-                p.setProperty("type." + t.name(), Boolean.toString(types[t.ordinal()]));
+                p.setProperty(
+                        "type." + t.name(),
+                        Boolean.toString(types[t.ordinal()])
+                );
             }
+
             p.setProperty("tracers", Boolean.toString(tracers));
             p.setProperty("radius", Integer.toString(radiusChunks));
 
@@ -209,11 +243,13 @@ for (String favorite : p.getProperty("favorites", "").split(",")) {
             p.setProperty("alColorMode", Integer.toString(alColorMode));
             p.setProperty("alSort", Integer.toString(alSort));
             p.setProperty("accent", Integer.toString(accent));
+
             p.setProperty("zoomFov", Integer.toString(zoomFov));
             p.setProperty("infoEnabled", Boolean.toString(infoEnabled));
             p.setProperty("infoCoords", Boolean.toString(infoCoords));
             p.setProperty("infoFps", Boolean.toString(infoFps));
             p.setProperty("infoDir", Boolean.toString(infoDir));
+
             p.setProperty("favorites", String.join(",", favorites));
 
             p.setProperty("freecamSpeed", Double.toString(freecamSpeed));
@@ -228,10 +264,18 @@ for (String favorite : p.getProperty("favorites", "").split(",")) {
             p.setProperty("auraRandomDelay", Boolean.toString(auraRandomDelay));
             p.setProperty("auraRotSpeed", Double.toString(auraRotSpeed));
             p.setProperty("auraJitter", Double.toString(auraJitter));
-            try (OutputStream out = Files.newOutputStream(file())) {
+
+            Path configFile = file();
+
+            Files.createDirectories(configFile.getParent());
+
+            try (OutputStream out = Files.newOutputStream(configFile)) {
                 p.store(out, "Storage Finder");
             }
-        } catch (Exception ignored) {
+
+        } catch (Exception e) {
+            System.err.println("Nie udało się zapisać konfiguracji Storage Finder: "
+                    + e.getMessage());
         }
     }
 }
