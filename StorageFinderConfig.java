@@ -145,9 +145,13 @@ public final class StorageFinderConfig {
             infoFps = b(p, "infoFps", true);
             infoDir = b(p, "infoDir", true);
             favorites.clear();
-            for (String f : p.getProperty("favorites", "").split(",")) {
-                if (!f.isBlank()) favorites.add(f.trim());
-            }
+           
+favorites.clear();
+for (String favorite : p.getProperty("favorites", "").split(",")) {
+    if (!favorite.isBlank()) {
+        favorites.add(favorite.trim());
+    }
+}
 
             freecamSpeed = dbl(p, "freecamSpeed", 3.0);
             auraRange = dbl(p, "auraRange", 3.0);
