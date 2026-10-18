@@ -170,10 +170,15 @@ public final class StorageFinderConfig {
 
             // Poprawiona nazwa zmiennej — brak konfliktu z Path f.
             for (String favorite : p.getProperty("favorites", "").split(",")) {
+    
+favorites.clear();
+
+for (String favorite : p.getProperty("favorites", "").split(",")) {
     if (!favorite.isBlank()) {
         favorites.add(favorite.trim());
     }
 }
+
 
             freecamSpeed = dbl(p, "freecamSpeed", 3.0);
             auraRange = dbl(p, "auraRange", 3.0);
