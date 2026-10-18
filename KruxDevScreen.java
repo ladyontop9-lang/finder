@@ -70,6 +70,8 @@ public class KruxDevScreen extends Screen {
         KruxUi.logo(g, this.font, x + 16, y + 14);
         g.drawString(this.font, Krux.NAME, x + 42, y + 16, KruxUi.TEXT);
         g.drawString(this.font, "Developer tools", x + 42, y + 27, KruxUi.MUT);
+        String ks = "Public key: " + Krux.keyStatus();
+        g.drawString(this.font, ks, x + PW - 16 - this.font.width(ks), y + 16, "OK".equals(Krux.keyStatus()) ? KruxUi.GREEN : KruxUi.RED);
 
         if (!Krux.hasPrivateKey()) drawSetup(g, mx, my, pt, x, y);
         else drawIssue(g, mx, my, pt, x, y);
@@ -93,6 +95,14 @@ public class KruxDevScreen extends Screen {
 
         KruxUi.button(g, this.font, x + 16, y + 112, 110, 20, "Generate keys",
                 KruxUi.hit(mx, my, x + 16, y + 112, 110, 20), true);
+        if (generatedPublic.isEmpty()) {
+            List<FormattedCharSequence> det = this.font.split(Component.literal(Krux.keyDetail()), PW - 32);
+            int dy = y + 140;
+            for (FormattedCharSequence l : det) {
+                g.drawString(this.font, l, x + 16, dy, KruxUi.MUT);
+                dy += 10;
+            }
+        }
 
         if (!generatedPublic.isEmpty()) {
             g.drawString(this.font, "Public key (copied):", x + 16, y + 140, KruxUi.TEXT);

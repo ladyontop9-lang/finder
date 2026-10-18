@@ -58,6 +58,8 @@ public class LicenseScreen extends Screen {
         KruxUi.logo(g, this.font, x + 16, y + 14);
         g.drawString(this.font, Krux.NAME, x + 42, y + 16, KruxUi.TEXT);
         g.drawString(this.font, "License activation", x + 42, y + 27, KruxUi.MUT);
+        String ks = "Public key: " + Krux.keyStatus();
+        g.drawString(this.font, ks, x + PW - 16 - this.font.width(ks), y + 16, "OK".equals(Krux.keyStatus()) ? KruxUi.DIM : KruxUi.RED);
 
         String info = Krux.licensed()
                 ? "Active: " + Krux.describe()

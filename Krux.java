@@ -63,6 +63,31 @@ public final class Krux {
         }
     }
 
+    /** Krótki status klucza publicznego zapisanego w TYM jarze. */
+    public static String keyStatus() {
+        String k = KruxPublicKey.PUBLIC_KEY;
+        if (k == null || k.contains("PASTE_YOUR")) return "NOT SET";
+        try {
+            KruxLicense.decodePublic(k);
+            return "OK";
+        } catch (Exception e) {
+            return "INVALID";
+        }
+    }
+
+    /** Szczegóły do diagnozy (klucz publiczny nie jest tajny). */
+    public static String keyDetail() {
+        String k = KruxPublicKey.PUBLIC_KEY == null ? "" : KruxPublicKey.PUBLIC_KEY;
+        if (k.contains("PASTE_YOUR")) return "This jar still has the placeholder key. Paste your public key and build again.";
+        String head = k.substring(0, Math.min(12, k.length()));
+        try {
+            KruxLicense.decodePublic(k);
+            return "Public key OK: " + head + "... (" + k.length() + " chars)";
+        } catch (Exception e) {
+            return "Public key INVALID: " + head + "... (" + k.length() + " chars). Expected ~60 chars starting with MCowBQYDK2VwAyEA.";
+        }
+    }
+
     public static boolean hasPrivateKey() { return Files.exists(devKeyFile()); }
 
     /** Build bez wklejonego klucza publicznego i bez klucza dewelopera = trzeba przejść konfigurację. */
