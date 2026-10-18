@@ -63,6 +63,16 @@ public final class Krux {
         }
     }
 
+    /** Wersja tego jara (zawiera skrót commita z GitHuba, np. 1.8.1+b40789a). */
+    public static String buildId() {
+        try {
+            return FabricLoader.getInstance().getModContainer("storagefinder")
+                    .map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("?");
+        } catch (Exception e) {
+            return "?";
+        }
+    }
+
     /** Krótki status klucza publicznego zapisanego w TYM jarze. */
     public static String keyStatus() {
         String k = KruxPublicKey.PUBLIC_KEY;

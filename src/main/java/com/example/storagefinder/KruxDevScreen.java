@@ -77,6 +77,7 @@ public class KruxDevScreen extends Screen {
         else drawIssue(g, mx, my, pt, x, y);
 
         if (!msg.isEmpty()) g.drawString(this.font, msg, x + 16, y + PH - 38, msgColor);
+        g.drawString(this.font, "Build " + Krux.buildId(), x + 16, y + PH - 24, KruxUi.DIM);
 
         boolean ch = KruxUi.hit(mx, my, x + PW - 70, y + PH - 28, 54, 16);
         KruxUi.button(g, this.font, x + PW - 70, y + PH - 28, 54, 16, "Close", ch, false);

@@ -77,6 +77,7 @@ public class LicenseScreen extends Screen {
 
         if (!msg.isEmpty()) g.drawString(this.font, msg, x + 16, y + 128, msgColor);
 
+        g.drawString(this.font, "Build " + Krux.buildId(), x + 16, y + PH - 21, KruxUi.DIM);
         String close = Krux.licensed() ? "Close" : "Continue without client features";
         int cw = this.font.width(close);
         boolean ch = KruxUi.hit(mx, my, x + PW / 2 - cw / 2 - 4, y + PH - 24, cw + 8, 14);
