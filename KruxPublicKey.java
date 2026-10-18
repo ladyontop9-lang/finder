@@ -6,7 +6,7 @@ package com.example.storagefinder;
  * który zostaje tylko u Ciebie.
  */
 public final class KruxPublicKey {
-    public static final String PUBLIC_KEY = "MCowBQYDK2VwAyEARNSbP+Io5mLlTPsYAs1miTtVH0weCsSv8y/IwfiY7qE==";
+    public static final String PUBLIC_KEY = "MCowBQYDK2VwAyEAPthSXtwhPpUWX+6HqSGUtoi/+NTAh0y5bmjk5qWOGF8=";
 
     private KruxPublicKey() {}
 }
