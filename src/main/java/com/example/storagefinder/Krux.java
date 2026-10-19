@@ -22,6 +22,19 @@ import net.minecraft.client.gui.screens.TitleScreen;
 public final class Krux {
     public static final String NAME = "Krux Client";
 
+    private static final java.util.Properties BUILD = loadBuild();
+    /** true tylko w jarze krux-client-1.8-developer.jar (build z -Pdev=true). */
+    public static final boolean DEV_BUILD = Boolean.parseBoolean(BUILD.getProperty("dev", "false"));
+
+    private static java.util.Properties loadBuild() {
+        java.util.Properties p = new java.util.Properties();
+        try (java.io.InputStream in = Krux.class.getResourceAsStream("/krux_build.properties")) {
+            if (in != null) p.load(in);
+        } catch (Exception ignored) {
+        }
+        return p;
+    }
+
     private static boolean licensed = false;
     private static boolean dev = false;
     private static boolean promptShown = false;
@@ -65,12 +78,13 @@ public final class Krux {
 
     /** Wersja tego jara (zawiera skrót commita z GitHuba, np. 1.8.1+b40789a). */
     public static String buildId() {
+        String ver = "?";
         try {
-            return FabricLoader.getInstance().getModContainer("storagefinder")
+            ver = FabricLoader.getInstance().getModContainer("storagefinder")
                     .map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("?");
-        } catch (Exception e) {
-            return "?";
+        } catch (Exception ignored) {
         }
+        return ver + (DEV_BUILD ? " DEV" : "") + " #" + BUILD.getProperty("build", "local");
     }
 
     /** Krótki status klucza publicznego zapisanego w TYM jarze. */
@@ -98,10 +112,21 @@ public final class Krux {
         }
     }
 
+    /** "none" (brak dev.key), "match" (pasuje do klucza w jarze / tryb konfiguracji), "mismatch" (inny klucz). */
+    public static String devKeyState() {
+        if (!DEV_BUILD || !hasPrivateKey()) return "none";
+        if (!configured()) return "match";
+        try {
+            return KruxLicense.keysMatch(devKeyLines()[0], KruxPublicKey.PUBLIC_KEY) ? "match" : "mismatch";
+        } catch (Exception e) {
+            return "mismatch";
+        }
+    }
+
     public static boolean hasPrivateKey() { return Files.exists(devKeyFile()); }
 
     /** Build bez wklejonego klucza publicznego i bez klucza dewelopera = trzeba przejść konfigurację. */
-    public static boolean needsSetup() { return !configured() && !hasPrivateKey(); }
+    public static boolean needsSetup() { return DEV_BUILD && !configured() && !hasPrivateKey(); }
 
     /** Opis licencji do pokazania w oknie. */
     public static String describe() {
@@ -128,7 +153,7 @@ public final class Krux {
         info = null;
 
         try {
-            if (hasPrivateKey()) {
+            if (DEV_BUILD && hasPrivateKey()) {
                 String priv = devKeyLines()[0];
                 dev = !configured() || KruxLicense.keysMatch(priv, KruxPublicKey.PUBLIC_KEY);
             }
@@ -219,6 +244,9 @@ public final class Krux {
     public static String generateKeys() throws Exception {
         KruxLicense.KeyPairB64 kp = KruxLicense.generateKeyPair();
         Files.createDirectories(dir());
+        if (hasPrivateKey()) {   // nigdy nie kasujemy starego klucza — robimy kopię
+            Files.copy(devKeyFile(), dir().resolve("dev.key." + (System.currentTimeMillis() / 1000) + ".bak"));
+        }
         Files.writeString(devKeyFile(), kp.privateKey() + System.lineSeparator() + kp.publicKey(), StandardCharsets.UTF_8);
         load();
         return kp.publicKey();

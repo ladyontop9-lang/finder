@@ -29,6 +29,10 @@ public class KruxDevScreen extends Screen {
         this.parent = parent;
     }
 
+    private boolean setupMode() {
+        return !Krux.hasPrivateKey() || "mismatch".equals(Krux.devKeyState());
+    }
+
     private int px() { return (this.width - PW) / 2; }
     private int py() { return (this.height - PH) / 2; }
 
@@ -73,7 +77,7 @@ public class KruxDevScreen extends Screen {
         String ks = "Public key: " + Krux.keyStatus();
         g.drawString(this.font, ks, x + PW - 16 - this.font.width(ks), y + 16, "OK".equals(Krux.keyStatus()) ? KruxUi.GREEN : KruxUi.RED);
 
-        if (!Krux.hasPrivateKey()) drawSetup(g, mx, my, pt, x, y);
+        if (setupMode()) drawSetup(g, mx, my, pt, x, y);
         else drawIssue(g, mx, my, pt, x, y);
 
         if (!msg.isEmpty()) g.drawString(this.font, msg, x + 16, y + PH - 38, msgColor);
@@ -84,7 +88,11 @@ public class KruxDevScreen extends Screen {
     }
 
     private void drawSetup(GuiGraphics g, int mx, int my, float pt, int x, int y) {
-        String text = "No developer key yet. Generate your signing keys: the PRIVATE key is saved to "
+        String text = Krux.hasPrivateKey()
+                ? "Your dev.key does NOT match the public key built into this jar. Put the right dev.key back into "
+                + "config/krux, or generate new keys (the old file is kept as dev.key.<time>.bak). New keys mean pasting "
+                + "the new public key into KruxPublicKey.java and rebuilding."
+                : "No developer key yet. Generate your signing keys: the PRIVATE key is saved to "
                 + "config/krux/dev.key (keep it secret, make a backup) and the PUBLIC key is copied to your clipboard. "
                 + "Paste the public key into KruxPublicKey.java, rebuild the mod and send that jar to customers.";
         List<FormattedCharSequence> lines = this.font.split(Component.literal(text), PW - 32);
@@ -169,7 +177,7 @@ public class KruxDevScreen extends Screen {
             return true;
         }
 
-        if (!Krux.hasPrivateKey()) {
+        if (setupMode()) {
             if (KruxUi.hit(mx, my, x + 16, y + 112, 110, 20)) {
                 try {
                     generatedPublic = Krux.generateKeys();

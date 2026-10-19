@@ -75,6 +75,12 @@ public class LicenseScreen extends Screen {
         KruxUi.button(g, this.font, x + 16, by, 80, 20, "Paste", KruxUi.hit(mx, my, x + 16, by, 80, 20), false);
         KruxUi.button(g, this.font, x + 102, by, 110, 20, "Activate", KruxUi.hit(mx, my, x + 102, by, 110, 20), true);
 
+        boolean mismatch = "mismatch".equals(Krux.devKeyState());
+        if (mismatch) {
+            KruxUi.button(g, this.font, x + 218, by, 96, 20, "Developer tools",
+                    KruxUi.hit(mx, my, x + 218, by, 96, 20), false);
+            g.drawString(this.font, "dev.key found, but it does not match this jar's public key.", x + 16, y + 142, KruxUi.RED);
+        }
         if (!msg.isEmpty()) g.drawString(this.font, msg, x + 16, y + 128, msgColor);
 
         g.drawString(this.font, "Build " + Krux.buildId(), x + 16, y + PH - 21, KruxUi.DIM);
@@ -96,6 +102,10 @@ public class LicenseScreen extends Screen {
             }
             if (KruxUi.hit(mx, my, x + 102, y + 98, 110, 20)) {
                 activate();
+                return true;
+            }
+            if ("mismatch".equals(Krux.devKeyState()) && KruxUi.hit(mx, my, x + 218, y + 98, 96, 20)) {
+                this.minecraft.setScreen(new KruxDevScreen(this));
                 return true;
             }
             String close = Krux.licensed() ? "Close" : "Continue without client features";

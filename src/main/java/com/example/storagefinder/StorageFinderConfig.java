@@ -45,6 +45,8 @@ public final class StorageFinderConfig {
 
     // ---- nowe moduły ----
     public static int zoomFov = 30;
+    public static boolean npEnabled = false;
+    public static String npName = "Krux";
     public static boolean infoEnabled = false;
     public static boolean infoCoords = true;
     public static boolean infoFps = true;
@@ -62,6 +64,8 @@ public final class StorageFinderConfig {
     public static boolean auraWalls = false;
     public static boolean auraRotate = false;
     public static int auraHitMode = 3;              // 0 Always, 1 Ground, 2 Crit, 3 Ground / Crit
+    public static double auraCritSens = 2.0;       // czułość krytyków 1..5
+    public static boolean auraStopSprint = true;   // zwolnij sprint w trybach z krytykiem
     public static boolean auraSilent = true;        // cicha rotacja (kamera się nie obraca)
     public static boolean auraRandomDelay = false;
     public static double auraRotSpeed = 40.0;      // maks. obrót na tick (stopnie)
@@ -140,6 +144,8 @@ public final class StorageFinderConfig {
             alSort = Math.max(0, Math.min(1, num(p, "alSort", 0)));
             accent = num(p, "accent", 0xA78BFA) & 0xFFFFFF;
             zoomFov = Math.max(30, Math.min(90, num(p, "zoomFov", 30)));
+            npEnabled = b(p, "npEnabled", false);
+            npName = p.getProperty("npName", "Krux");
             infoEnabled = b(p, "infoEnabled", false);
             infoCoords = b(p, "infoCoords", true);
             infoFps = b(p, "infoFps", true);
@@ -157,6 +163,8 @@ public final class StorageFinderConfig {
             auraWalls = b(p, "auraWalls", false);
             auraRotate = b(p, "auraRotate", false);
             auraHitMode = Math.max(0, Math.min(3, num(p, "auraHitMode", 3)));
+            auraCritSens = Math.max(1.0, Math.min(5.0, dbl(p, "auraCritSens", 2.0)));
+            auraStopSprint = b(p, "auraStopSprint", true);
             auraSilent = b(p, "auraSilent", true);
             auraRandomDelay = b(p, "auraRandomDelay", false);
             auraRotSpeed = dbl(p, "auraRotSpeed", 40.0);
@@ -206,6 +214,8 @@ public final class StorageFinderConfig {
             p.setProperty("alSort", Integer.toString(alSort));
             p.setProperty("accent", Integer.toString(accent));
             p.setProperty("zoomFov", Integer.toString(zoomFov));
+            p.setProperty("npEnabled", Boolean.toString(npEnabled));
+            p.setProperty("npName", npName == null ? "Krux" : npName);
             p.setProperty("infoEnabled", Boolean.toString(infoEnabled));
             p.setProperty("infoCoords", Boolean.toString(infoCoords));
             p.setProperty("infoFps", Boolean.toString(infoFps));
@@ -220,6 +230,8 @@ public final class StorageFinderConfig {
             p.setProperty("auraWalls", Boolean.toString(auraWalls));
             p.setProperty("auraRotate", Boolean.toString(auraRotate));
             p.setProperty("auraHitMode", Integer.toString(auraHitMode));
+            p.setProperty("auraCritSens", Double.toString(auraCritSens));
+            p.setProperty("auraStopSprint", Boolean.toString(auraStopSprint));
             p.setProperty("auraSilent", Boolean.toString(auraSilent));
             p.setProperty("auraRandomDelay", Boolean.toString(auraRandomDelay));
             p.setProperty("auraRotSpeed", Double.toString(auraRotSpeed));

@@ -35,6 +35,10 @@ public final class Modules {
                         () -> StorageFinderConfig.auraSpeed, v -> StorageFinderConfig.auraSpeed = v),
                 new Setting.Mode("Hit when", new String[]{"Always", "On ground", "Can crit", "Ground or crit"},
                         () -> StorageFinderConfig.auraHitMode, v -> StorageFinderConfig.auraHitMode = v),
+                new Setting.Slider("Crit sensitivity", 1, 5, 1, true,
+                        () -> StorageFinderConfig.auraCritSens, v -> StorageFinderConfig.auraCritSens = v),
+                new Setting.Bool("Stop sprint for crits", NONE,
+                        () -> StorageFinderConfig.auraStopSprint, v -> StorageFinderConfig.auraStopSprint = v),
                 new Setting.Bool("Players only", NONE,
                         () -> StorageFinderConfig.auraPlayersOnly, v -> StorageFinderConfig.auraPlayersOnly = v),
                 new Setting.Bool("Wait for cooldown", NONE,
@@ -141,6 +145,14 @@ public final class Modules {
                         () -> StorageFinderConfig.alBackground, v -> StorageFinderConfig.alBackground = v)
         ));
         ALL.add(ARRAY_LIST);
+
+        ALL.add(new Module("Name Protect", "Misc",
+                "Replaces your real name with a fake one in chat, tab list and nametags (client side only).",
+                new String[]{"Privacy"},
+                () -> StorageFinderConfig.npEnabled, v -> StorageFinderConfig.npEnabled = v, List.of(
+                new Setting.Text("Fake name", 16,
+                        () -> StorageFinderConfig.npName, v -> StorageFinderConfig.npName = v)
+        )));
 
         ALL.add(new Module("Info", "Misc",
                 "Shows coordinates, FPS and facing direction in the top left corner.",

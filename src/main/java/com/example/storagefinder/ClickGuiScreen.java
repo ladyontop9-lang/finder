@@ -25,7 +25,7 @@ public class ClickGuiScreen extends Screen {
 
     private static final int SB = 108, HEAD = 26, GAPC = 8;
     private static final int HEAD_H = 20, TAG_H = 18, PAD_TOP = 4, PAD_BOT = 4;
-    private static final int R_BOOL = 16, R_MODE = 30, R_SLIDER = 22, R_COLOR = 44, R_SWATCH = 26, R_BIND = 16;
+    private static final int R_BOOL = 16, R_MODE = 30, R_SLIDER = 22, R_COLOR = 44, R_SWATCH = 26, R_BIND = 16, R_TEXT = 30;
 
     // ---- ikony 9x9 / 7x7 (piksele) ----
     private static final String[] I_COMBAT = {".......##", "......###", ".....###.", "....###..", "#..###...", ".####....", "..##.....", ".#.##....", "#...#...."};
@@ -52,7 +52,7 @@ public class ClickGuiScreen extends Screen {
             new Nav("Favorites", "Favorites", I_STAR, 1)
     };
 
-    private enum Kind { NAV, HEAD, TOGGLE, STAR, BOOL, SLIDER, CHANNEL, DROPDOWN, DD_OPT, SWATCH, BIND, CTX_BIND, CTX_RESET }
+    private enum Kind { NAV, HEAD, TOGGLE, STAR, BOOL, SLIDER, CHANNEL, DROPDOWN, DD_OPT, SWATCH, BIND, CTX_BIND, CTX_RESET, TEXT }
 
     private record Hit(Kind kind, int x, int y, int w, int h, boolean body, Module mod, Setting setting, int idx) {
         boolean inside(double mx, double my) {
@@ -63,6 +63,9 @@ public class ClickGuiScreen extends Screen {
     private final List<Hit> hits = new ArrayList<>();
     private List<Nav> navList = new ArrayList<>(List.of(NAVS));
     private EditBox search;
+    private EditBox textBox;
+    private Setting.Text editing = null;
+    private int editX, editY, editW;
 
     private int cat = 0;
     private Module binding = null;
@@ -142,6 +145,7 @@ public class ClickGuiScreen extends Screen {
     }
 
     private void startPage() {
+        commitText();
         pageT = 0;
         scroll = 0;
         scrollTarget = 0;
@@ -182,6 +186,12 @@ public class ClickGuiScreen extends Screen {
         search.setResponder(s -> startPage());
         addWidget(search);
 
+        textBox = new EditBox(this.font, 0, 0, 100, 14, Component.literal("Text"));
+        textBox.setBordered(false);
+        textBox.setTextColor(TEXT);
+        textBox.setVisible(false);
+        addWidget(textBox);
+
         for (Module m : Modules.ALL) m.onAnim = m.isEnabled() ? 1f : 0f;
         lastNanos = 0;
         openT = 0;
@@ -212,6 +222,7 @@ public class ClickGuiScreen extends Screen {
         if (s instanceof Setting.Mode) return R_MODE;
         if (s instanceof Setting.ColorPick) return R_COLOR;
         if (s instanceof Setting.Swatches) return R_SWATCH;
+        if (s instanceof Setting.Text) return R_TEXT;
         return R_BOOL;
     }
 
@@ -315,7 +326,7 @@ public class ClickGuiScreen extends Screen {
         fill(g, wx, fy, wx + SB, fy + 1, BORDER);
         rr(g, wx + 8, fy + 6, 16, 16, 4, 0xFF0B0B0D);
         txt(g, "K", wx + 8 + 8 - this.font.width("K") / 2, fy + 10, accent());
-        String name = Minecraft.getInstance().getUser().getName();
+        String name = NameProtect.apply(Minecraft.getInstance().getUser().getName());
         if (this.font.width(name) > SB - 52) name = this.font.plainSubstrByWidth(name, SB - 52);
         txt(g, name, wx + 30, fy + 6, TEXT);
         txt(g, Krux.shortStatus(), wx + 30, fy + 16, Krux.licensed() ? MUT : PINK);
@@ -416,6 +427,7 @@ public class ClickGuiScreen extends Screen {
             else if (s instanceof Setting.Mode md) drawMode(g, m, md, x, yy, cw);
             else if (s instanceof Setting.Swatches sw) drawSwatches(g, m, sw, x, yy, cw);
             else if (s instanceof Setting.ColorPick cp) drawColor(g, m, cp, x, yy, cw);
+            else if (s instanceof Setting.Text tx) drawText(g, m, tx, x, yy, cw);
             yy += settingHeight(s);
         }
 
@@ -427,6 +439,40 @@ public class ClickGuiScreen extends Screen {
         txtR(g, kt, x + cw - 7, yy + 4, wait ? accent() : MUT);
         hits.add(new Hit(Kind.BIND, x, yy, cw, R_BIND, true, m, null, 0));
     }
+
+    private void commitText() {
+        if (editing != null) {
+            editing.set(textBox.getValue().trim());
+            editing = null;
+            StorageFinderConfig.save();
+        }
+        if (textBox != null) {
+            textBox.setVisible(false);
+            textBox.setFocused(false);
+        }
+    }
+
+    private void drawText(GuiGraphics g, Module m, Setting.Text tx, int x, int y, int cw) {
+        icon(g, I_LIST, x + 8, y + 2, accent());
+        txt(g, tx.name, x + 19 + 4, y + 2, TEXT);
+        int fx = x + 7, fw = cw - 14, fy = y + 13;
+        boolean active = editing == tx;
+        box(g, fx, fy, fw, 15, 4, FIELD, active ? accent() : BORDER);
+        if (active) {
+            textBox.setX(fx + 6);
+            textBox.setY(fy + 3);
+            textBox.setWidth(fw - 12);
+            textBox.render(this.dummyG(g), 0, 0, 0f);
+            editX = fx;
+            editY = fy;
+            editW = fw;
+        } else {
+            txt(g, tx.get(), fx + 6, fy + 4, 0xFFB4B4BE);
+        }
+        hits.add(new Hit(Kind.TEXT, fx, fy, fw, 15, true, m, tx, 0));
+    }
+
+    private GuiGraphics dummyG(GuiGraphics g) { return g; }
 
     private void drawBool(GuiGraphics g, Module m, Setting.Bool b, int x, int y, int cw) {
         icon(g, I_TOGGLE, x + 8, y + 5, accent());
@@ -562,6 +608,20 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
+        if (editing != null) {
+            int k = event.key();
+            if (k == 257 || k == 335) {                 // Enter = zatwierdź
+                commitText();
+                return true;
+            }
+            if (k == 256) {                             // ESC = anuluj edycję
+                editing = null;
+                textBox.setVisible(false);
+                textBox.setFocused(false);
+                return true;
+            }
+            return super.keyPressed(event);
+        }
         if (binding != null) {
             Module m = binding;
             binding = null;
@@ -598,6 +658,12 @@ public class ClickGuiScreen extends Screen {
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         double mx = event.x(), my = event.y();
         int btn = event.button();
+
+        if (editing != null) {
+            boolean inField = mx >= editX && mx < editX + editW && my >= editY && my < editY + 15;
+            if (inField) return super.mouseClicked(event, doubleClick);
+            commitText();
+        }
 
         // klik poza otwartym popupem tylko go zamyka
         if ((ctxModule != null || ddSetting != null) && !popupHitAt(mx, my)) {
@@ -682,6 +748,16 @@ public class ClickGuiScreen extends Screen {
                         StorageFinderConfig.save();
                     }
                 }
+                case TEXT -> {
+                    if (btn == 0) {
+                        editing = (Setting.Text) h.setting();
+                        textBox.setMaxLength(editing.maxLen);
+                        textBox.setValue(editing.get());
+                        textBox.setVisible(true);
+                        setFocused(textBox);
+                        textBox.setFocused(true);
+                    }
+                }
                 case SWATCH -> {
                     if (btn == 0) {
                         ((Setting.Swatches) h.setting()).set(h.idx());
@@ -727,6 +803,7 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public void onClose() {
+        commitText();
         StorageFinderConfig.save();
         super.onClose();
     }

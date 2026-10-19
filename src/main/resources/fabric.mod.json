@@ -14,5 +14,8 @@
     "fabricloader": ">=0.17.0",
     "minecraft": "1.21.11",
     "fabric-api": "*"
-  }
+  },
+  "mixins": [
+    "krux.mixins.json"
+  ]
 }

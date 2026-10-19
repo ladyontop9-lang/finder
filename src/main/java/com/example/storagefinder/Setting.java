@@ -6,6 +6,7 @@ import java.util.function.DoubleConsumer;
 import java.util.function.DoubleSupplier;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 
 public abstract class Setting {
     public final String name;
@@ -134,6 +135,26 @@ public abstract class Setting {
         }
 
         public void set(int i) { setter.accept(colors[i] & 0xFFFFFF); }
+        @Override public void reset() { setter.accept(def); }
+    }
+
+    /** Pole tekstowe (np. fałszywy nick). */
+    public static final class Text extends Setting {
+        public final int maxLen;
+        private final Supplier<String> getter;
+        private final Consumer<String> setter;
+        private final String def;
+
+        public Text(String name, int maxLen, Supplier<String> getter, Consumer<String> setter) {
+            super(name);
+            this.maxLen = maxLen;
+            this.getter = getter;
+            this.setter = setter;
+            this.def = getter.get();
+        }
+
+        public String get() { return getter.get(); }
+        public void set(String v) { setter.accept(v); }
         @Override public void reset() { setter.accept(def); }
     }
 }

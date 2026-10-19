@@ -12,10 +12,17 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Aura z cichą rotacją.
- * START ticka: wybiera cel i ustawia obrót gracza na cel (serwer dostanie go w pakiecie pozycji z tego ticka).
- * END ticka: atakuje i natychmiast przywraca Twój prawdziwy obrót. Ponieważ klatki rysują się między tickami,
- * kamera nigdy nie widzi tego obrotu — nie musisz patrzeć na przeciwnika.
+ * Aura z cichą rotacją i większą czułością na krytyki.
+ *
+ * Tryby "Hit when": 0 Always, 1 On ground, 2 Can crit, 3 Ground or crit.
+ *
+ * Czułość krytyków: krytyk jest możliwy dopiero, gdy spadasz (fallDistance > 0). Aura nie czeka więc na sam
+ * moment spadania, tylko PRZEWIDUJE go już w ostatnich tickach wznoszenia (prędkość pionowa bliska zera) i jest
+ * gotowa uderzyć w pierwszym możliwym ticku. Im wyższa czułość, tym wcześniej się "napina". Dodatkowo
+ * używa dokładnego progu ładowania ataku jak serwer (> 0.9) i może zwolnić sprint, który blokuje krytyki.
+ *
+ * START ticka: wybiera cel i ustawia obrót na cel (cicha rotacja).
+ * END ticka: sprawdza prawdziwy stan, atakuje i przywraca Twój prawdziwy obrót.
  */
 public final class Aura {
     private static boolean enabled = false;
@@ -41,14 +48,37 @@ public final class Aura {
                 && p.isAlive() && !p.isUsingItem();
     }
 
-    /** Czy TY możesz teraz zadać krytyk (spadasz, nie sprintujesz, nie jesteś w wodzie itd.). */
-    private static boolean canCrit(LocalPlayer p) {
-        return p.fallDistance > 0.0 && !p.onGround() && !p.onClimbable() && !p.isInWater()
+    /** Warunki krytyka niezwiązane z samym spadaniem. */
+    private static boolean critBase(LocalPlayer p) {
+        return !p.onGround() && !p.onClimbable() && !p.isInWater()
                 && !p.hasEffect(MobEffects.BLINDNESS) && !p.isPassenger() && !p.isSprinting();
     }
 
-    /** Warunek "Hit when": zawsze / na ziemi / gdy może być krytyk / ziemia lub krytyk. */
-    private static boolean modeOk(LocalPlayer p) {
+    /** Czy TY możesz teraz zadać krytyk (stan rzeczywisty — używany tuż przed atakiem). */
+    private static boolean canCrit(LocalPlayer p) {
+        return p.fallDistance > 0.0 && critBase(p);
+    }
+
+    /**
+     * Przewidywanie na początku ticka: czy w tym ticku będziemy już spadać?
+     * Tolerancja prędkości pionowej rośnie z czułością (1..5 => 0.02..0.10).
+     */
+    private static boolean canCritSoon(LocalPlayer p) {
+        if (p.fallDistance > 0.0) return critBase(p);
+        double tol = 0.02 * Math.max(1.0, StorageFinderConfig.auraCritSens);
+        return critBase(p) && p.getDeltaMovement().y <= tol;
+    }
+
+    private static boolean modeOkStart(LocalPlayer p) {
+        return switch (StorageFinderConfig.auraHitMode) {
+            case 1 -> p.onGround();
+            case 2 -> canCritSoon(p);
+            case 3 -> p.onGround() || canCritSoon(p);
+            default -> true;
+        };
+    }
+
+    private static boolean modeOkEnd(LocalPlayer p) {
         return switch (StorageFinderConfig.auraHitMode) {
             case 1 -> p.onGround();
             case 2 -> canCrit(p);
@@ -66,25 +96,7 @@ public final class Aura {
         return walls || p.hasLineOfSight(e);
     }
 
-    // ---------------------------------------------------------------- START ticka
-
-    public static void tickStart(Minecraft mc) {
-        pending = null;
-        rotated = false;
-        if (!enabled || !ready(mc)) return;
-
-        if (cooldown > 0) {
-            cooldown--;
-            return;
-        }
-
-        LocalPlayer p = mc.player;
-        ClientLevel level = mc.level;
-        if (!modeOk(p)) return;
-
-        // na początku ticka licznik ataku jest jeszcze o 1 tick do tyłu -> przewidujemy (+1.0)
-        if (StorageFinderConfig.auraCooldown && p.getAttackStrengthScale(1.0f) < 0.95f) return;
-
+    private static LivingEntity findTarget(LocalPlayer p, ClientLevel level) {
         double range = StorageFinderConfig.auraRange;
         double r2 = range * range;
         boolean playersOnly = StorageFinderConfig.auraPlayersOnly;
@@ -101,10 +113,43 @@ public final class Aura {
                 bestD = d2;
             }
         }
+        return best;
+    }
+
+    // ---------------------------------------------------------------- START ticka
+
+    public static void tickStart(Minecraft mc) {
+        pending = null;
+        rotated = false;
+        if (!enabled || !ready(mc)) return;
+
+        if (cooldown > 0) {
+            cooldown--;
+            return;
+        }
+
+        LocalPlayer p = mc.player;
+        ClientLevel level = mc.level;
+        int mode = StorageFinderConfig.auraHitMode;
+        boolean critMode = mode == 2 || mode == 3;
+
+        // sprint blokuje krytyki — w trybach z krytykiem można go zwolnić
+        if (critMode && StorageFinderConfig.auraStopSprint && !p.onGround()) {
+            mc.options.keySprint.setDown(false);
+            p.setSprinting(false);
+        }
+
+        // przewidujemy ładowanie ataku na koniec tego ticka; serwer wymaga > 0.9
+        if (StorageFinderConfig.auraCooldown && p.getAttackStrengthScale(1.5f) < 0.91f) return;
+
+        if (!modeOkStart(p)) return;
+
+        LivingEntity best = findTarget(p, level);
         if (best == null) return;
         pending = best;
 
         if (StorageFinderConfig.auraSilent && !Freecam.isActive()) {
+            Vec3 eye = p.getEyePosition();
             AABB bb = best.getBoundingBox();
             Vec3 c = bb.getCenter();
             double j = Math.max(0.0, StorageFinderConfig.auraJitter);
@@ -135,7 +180,8 @@ public final class Aura {
     public static void tickEnd(Minecraft mc) {
         LocalPlayer p = mc.player;
         try {
-            if (pending != null && enabled && p != null && ready(mc) && modeOk(p)) {
+            if (pending != null && enabled && p != null && ready(mc) && modeOkEnd(p)
+                    && (!StorageFinderConfig.auraCooldown || p.getAttackStrengthScale(0.5f) > 0.9f)) {
                 Vec3 eye = p.getEyePosition();
                 double range = StorageFinderConfig.auraRange;
                 if (validTarget(p, pending, eye, range * range,
