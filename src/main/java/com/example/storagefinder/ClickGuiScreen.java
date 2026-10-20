@@ -178,7 +178,7 @@ public class ClickGuiScreen extends Screen {
     protected void init() {
         navList = new ArrayList<>(List.of(NAVS));
         navList.add(new Nav("License", "Licencja", I_KEY, 1));
-        if (Krux.isDev()) navList.add(new Nav("Developer", "Developer", I_MISC, 1));
+        if (Krux.DEV_BUILD) navList.add(new Nav("Developer", "Developer", I_MISC, 1));
         layout(0);
         int btnX = wx + ww - 8 - 16;
         int sbx = btnX - 6 - 124;
@@ -332,7 +332,7 @@ public class ClickGuiScreen extends Screen {
         String name = NameProtect.apply(Minecraft.getInstance().getUser().getName());
         if (this.font.width(name) > SB - 52) name = this.font.plainSubstrByWidth(name, SB - 52);
         txt(g, name, wx + 30, fy + 6, TEXT);
-        txt(g, Krux.isDev() ? "Developer" : "Customer", wx + 30, fy + 16, MUT);
+        txt(g, Krux.DEV_BUILD ? "Developer" : "Customer", wx + 30, fy + 16, MUT);
 
         // nagłówek: ścieżka
         int cx = wx + SB + 12;

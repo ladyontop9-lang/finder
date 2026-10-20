@@ -1,0 +1,14 @@
+KRUX CLIENT - INSTRUKCJA DLA KLIENTA (wyslij razem z plikiem .jar i kluczem licencji)
+
+Wymagania: Minecraft 1.21.11 z Fabric Loader oraz Fabric API.
+
+1. Wrzuc plik krux-client-....jar oraz Fabric API do folderu "mods".
+2. Uruchom gre. Przy pierwszym wejsciu pojawi sie okno "Krux Client license".
+3. Kliknij "Paste" (albo wklej klucz Ctrl+V) i kliknij "Activate".
+4. Gotowe - klucz zapamietuje sie na stale, nie musisz go wpisywac ponownie.
+
+Menu otwierasz klawiszem K.
+Licencje sprawdzisz w menu: K -> pasek boczny -> License.
+Licencja miesieczna: po wygasnieciu dostaniesz nowy klucz - wklej go w tym samym oknie (K -> License).
+
+Nie udostepniaj swojego klucza innym osobom.

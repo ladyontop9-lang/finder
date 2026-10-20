@@ -76,7 +76,8 @@ public final class Krux {
 
     // ------------------------------------------------------------------ stan
 
-    public static boolean licensed() { return licensed || dev; }
+    /** Wersja developer (krux-client-1.8-developer.jar) zawsze ma pełny dostęp — bez licencji i bez dev.key. */
+    public static boolean licensed() { return licensed || dev || DEV_BUILD; }
     public static boolean isDev() { return dev; }
     public static String status() { return status; }
     public static KruxLicense.Info info() { return info; }
@@ -144,7 +145,7 @@ public final class Krux {
 
     /** Opis licencji do pokazania w oknie. */
     public static String describe() {
-        if (dev) return "Developer mode";
+        if (dev || DEV_BUILD) return "Developer mode";
         if (!licensed || info == null) return status;
         if (info.lifetime()) return "Lifetime license";
         long left = info.expiryDay() - today();
