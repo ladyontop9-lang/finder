@@ -4,11 +4,23 @@ plugins {
 }
 
 def sha = System.getenv("GITHUB_SHA")
-version = project.mod_version + (sha ? "+" + sha.take(7) : "")
+
+version = project.mod_version
 group = project.maven_group
 
 base {
-    archivesName = project.archives_base_name
+    archivesName = "krux-client-1.8"
+}
+
+// nazwy plików bez numeru wersji
+tasks.withType(AbstractArchiveTask).configureEach {
+    archiveVersion = ""
+}
+
+// zwykły jar (nieprzemapowany, z klasyfikatorem "dev") idzie do osobnego folderu,
+// żeby w build/libs były tylko gotowe pliki dla gry
+tasks.named('jar') {
+    destinationDirectory = layout.buildDirectory.dir("devlibs")
 }
 
 repositories {
@@ -22,9 +34,14 @@ dependencies {
 }
 
 processResources {
-    inputs.property "version", project.version
+    inputs.property "version", project.version.toString()
+    inputs.property "sha", sha ? sha.take(7) : "local"
+
     filesMatching("fabric.mod.json") {
-        expand "version": inputs.properties.version
+        expand "version": project.version.toString()
+    }
+    filesMatching("krux_build.properties") {
+        expand "build": (sha ? sha.take(7) : "local")
     }
 }
 
@@ -33,7 +50,18 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 java {
-    withSourcesJar()
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
+}
+
+// Jeden build = DWA pliki w build/libs:
+//   krux-client-1.8.jar            (wersja dla klientów)
+//   krux-client-1.8-developer.jar  (wersja dla dewelopera: ta sama zawartość, tryb dewelopera włącza nazwa pliku + dev.key)
+tasks.register('developerJar', Copy) {
+    from tasks.named('remapJar')
+    into layout.buildDirectory.dir("libs")
+    rename { String name -> "krux-client-1.8-developer.jar" }
+}
+tasks.named('assemble') {
+    dependsOn 'developerJar'
 }
