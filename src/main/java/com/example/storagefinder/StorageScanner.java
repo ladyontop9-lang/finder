@@ -11,6 +11,7 @@ import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -41,6 +42,9 @@ import net.minecraft.world.phys.AABB;
 public final class StorageScanner {
     public record Entry(BlockPos pos, StorageType type) {}
 
+    /** Chunk z ogromną ilością wyrośniętego ametystu — rysowany na czerwono. */
+    public record SusChunk(int cx, int cz, int count, int minY, int maxY) {}
+
     public enum Kind { PLAYER, HOSTILE, PASSIVE }
 
     public record Target(LivingEntity entity, Kind kind) {}
@@ -50,6 +54,10 @@ public final class StorageScanner {
 
     private static volatile List<Entry> found = List.of();
     private static volatile List<Target> targets = List.of();
+    private static volatile List<SusChunk> sus = List.of();
+    private static final Set<Long> notified = new HashSet<>();
+    private static boolean lastSusOn = false;
+    private static int lastSusThr = -1;
     private static List<Entry> beEntries = List.of();
     private static List<Entry> blockEntries = List.of();
     private static int[] beCounts = new int[N];
@@ -72,12 +80,15 @@ public final class StorageScanner {
 
     public static List<Target> targets() { return targets; }
 
+    public static List<SusChunk> sus() { return sus; }
+
     public static int count(StorageType t) {
         return beCounts[t.ordinal()] + blockCounts[t.ordinal()];
     }
 
     private static void clearStorage() {
         found = List.of();
+        sus = List.of();
         beEntries = List.of();
         blockEntries = List.of();
         beCounts = new int[N];
@@ -96,6 +107,7 @@ public final class StorageScanner {
                 clearStorage();
                 targets = List.of();
             }
+            notified.clear();
             return;
         }
 
@@ -115,13 +127,19 @@ public final class StorageScanner {
                 scanBlockEntities(mc, level);
                 changed = true;
             }
+            boolean blocksChanged = false;
             if (!blockTypes.isEmpty()) {
-                changed |= stepBlocks(mc, level);
+                blocksChanged = stepBlocks(mc, level);
+                changed |= blocksChanged;
             } else if (!blockEntries.isEmpty()) {
                 blockEntries = List.of();
                 blockCounts = new int[N];
                 changed = true;
+                blocksChanged = true;
             }
+
+            boolean susDirty = StorageFinderConfig.susEnabled != lastSusOn || StorageFinderConfig.susThreshold != lastSusThr;
+            if (blocksChanged || susDirty) rebuildSus(mc);
 
             if (changed) {
                 List<Entry> merged = new ArrayList<>(beEntries.size() + blockEntries.size());
@@ -190,7 +208,9 @@ public final class StorageScanner {
         Map<Block, StorageType> m = new HashMap<>();
         for (StorageType t : StorageType.values()) {
             Block b = blockFor(t);
-            if (b != null && StorageFinderConfig.isOn(t)) m.put(b, t);
+            boolean need = StorageFinderConfig.isOn(t)
+                    || (t == StorageType.AMETHYST && StorageFinderConfig.susEnabled);
+            if (b != null && need) m.put(b, t);
         }
         blockTypes = m;
     }
@@ -257,6 +277,7 @@ public final class StorageScanner {
             int[] cnt = new int[N];
             for (List<Entry> l : blockCache.values()) {
                 for (Entry e : l) {
+                    if (e.type() == StorageType.AMETHYST && !StorageFinderConfig.isOn(StorageType.AMETHYST)) continue;
                     merged.add(e);
                     cnt[e.type().ordinal()]++;
                 }
@@ -285,6 +306,42 @@ public final class StorageScanner {
                         StorageType t = types.get(s.getBlockState(x, y, z).getBlock());
                         if (t != null) out.add(new Entry(new BlockPos(baseX + x, baseY + y, baseZ + z), t));
                     }
+                }
+            }
+        }
+    }
+
+    /** Liczy wyrośnięte kryształy ametystu na chunk i wyznacza "sus" chunki (próg z ustawień). */
+    private static void rebuildSus(Minecraft mc) {
+        lastSusOn = StorageFinderConfig.susEnabled;
+        lastSusThr = StorageFinderConfig.susThreshold;
+        if (!lastSusOn) {
+            sus = List.of();
+            return;
+        }
+
+        List<SusChunk> out = new ArrayList<>();
+        for (Map.Entry<Long, List<Entry>> en : blockCache.entrySet()) {
+            int n = 0, minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE;
+            for (Entry e : en.getValue()) {
+                if (e.type() != StorageType.AMETHYST) continue;
+                n++;
+                int y = e.pos().getY();
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+            if (n >= lastSusThr) {
+                long k = en.getKey();
+                out.add(new SusChunk(ChunkPos.getX(k), ChunkPos.getZ(k), n, minY, maxY));
+            }
+        }
+        sus = out;
+
+        if (StorageFinderConfig.susNotify && mc.player != null) {
+            for (SusChunk c : out) {
+                if (notified.add(ChunkPos.asLong(c.cx(), c.cz()))) {
+                    mc.player.displayClientMessage(Component.literal("§c[Krux] Sus chunk: X " + (c.cx() * 16)
+                            + " Z " + (c.cz() * 16) + "  (" + c.count() + " amethyst clusters)"), false);
                 }
             }
         }

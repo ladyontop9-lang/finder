@@ -80,7 +80,9 @@ public final class StorageRenderer {
 
         java.util.List<StorageScanner.Entry> entries = sf ? StorageScanner.found() : java.util.List.of();
         java.util.List<StorageScanner.Target> targets = (esp || tr) ? StorageScanner.targets() : java.util.List.of();
-        if (entries.isEmpty() && targets.isEmpty()) return;
+        java.util.List<StorageScanner.SusChunk> susList = (sf && StorageFinderConfig.susEnabled)
+                ? StorageScanner.sus() : java.util.List.of();
+        if (entries.isEmpty() && targets.isEmpty() && susList.isEmpty()) return;
 
         boolean blockTracers = sf && StorageFinderConfig.tracers;
         float pt = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
@@ -112,6 +114,18 @@ public final class StorageRenderer {
             if (blockTracers) {
                 renderTracer(pose, buffer, camera, look,
                         p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, c[0], c[1], c[2], 0.9f, thick);
+            }
+        }
+
+        // ---- sus chunki: ogromna ilość wyrośniętego ametystu => cały chunk na czerwono ----
+        for (StorageScanner.SusChunk sc : susList) {
+            ensureBuffer();
+            float sx = sc.cx() * 16f, sz = sc.cz() * 16f;
+            float sy0 = sc.minY() - 1f, sy1 = sc.maxY() + 2f;
+            renderFilledBox(pose, buffer, sx, sy0, sz, sx + 16f, sy1, sz + 16f, 1f, 0.08f, 0.08f, 0.22f);
+            if (blockTracers) {
+                renderTracer(pose, buffer, camera, look, sx + 8.0, (sy0 + sy1) / 2.0, sz + 8.0,
+                        1f, 0.15f, 0.15f, 0.9f, thick);
             }
         }
 

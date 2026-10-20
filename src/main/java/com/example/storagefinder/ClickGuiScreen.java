@@ -39,6 +39,8 @@ public class ClickGuiScreen extends Screen {
     private static final String[] I_LIST = {"#######", "#.....#", "#.###.#", "#.....#", "#.###.#", "#.....#", "#######"};
     private static final String[] I_KEY = {".###...", "#...#..", "#...#..", ".###...", "..#....", "..##...", "..#...."};
     private static final String[] I_COLOR = {".#####.", "#.....#", "#.###.#", "#.###.#", "#.###.#", "#.....#", ".#####."};
+    private static final String[] I_REFRESH = {".###.#.", "#...##.", "#....#.", "#......", "#.....#", ".#...#.", "..###.."};
+    private static final String[] I_SCRIPT = {".#####.", "#.....#", "#.#.#.#", "#..#..#", "#.#.#.#", "#.....#", ".#####."};
     private static final String[] I_PLUS = {"..#..", "..#..", "#####", "..#..", "..#.."};
     private static final String[] I_RESET = {".###.", "#...#", "#....", "#...#", ".###."};
 
@@ -49,10 +51,11 @@ public class ClickGuiScreen extends Screen {
             new Nav("Movement", "Movement", I_MOVE, 0),
             new Nav("Misc", "Misc", I_MISC, 0),
             new Nav("Render", "Render", I_RENDER, 0),
-            new Nav("Favorites", "Favorites", I_STAR, 1)
+            new Nav("Skrypty", "Skrypty", I_SCRIPT, 1),
+            new Nav("Favorites", "Ulubione", I_STAR, 1)
     };
 
-    private enum Kind { NAV, HEAD, TOGGLE, STAR, BOOL, SLIDER, CHANNEL, DROPDOWN, DD_OPT, SWATCH, BIND, CTX_BIND, CTX_RESET, TEXT }
+    private enum Kind { NAV, HEAD, TOGGLE, STAR, BOOL, SLIDER, CHANNEL, DROPDOWN, DD_OPT, SWATCH, BIND, CTX_BIND, CTX_RESET, TEXT, REFRESH }
 
     private record Hit(Kind kind, int x, int y, int w, int h, boolean body, Module mod, Setting setting, int idx) {
         boolean inside(double mx, double my) {
@@ -165,7 +168,7 @@ public class ClickGuiScreen extends Screen {
     }
 
     private String keyText(Module m) {
-        if (m.keyMapping == null || m.keyMapping.isUnbound()) return "None";
+        if (m.keyMapping == null || m.keyMapping.isUnbound()) return "Brak";
         return m.keyMapping.getTranslatedKeyMessage().getString();
     }
 
@@ -174,7 +177,7 @@ public class ClickGuiScreen extends Screen {
     @Override
     protected void init() {
         navList = new ArrayList<>(List.of(NAVS));
-        navList.add(new Nav("License", "License", I_KEY, 1));
+        navList.add(new Nav("License", "Licencja", I_KEY, 1));
         if (Krux.isDev()) navList.add(new Nav("Developer", "Developer", I_MISC, 1));
         layout(0);
         int btnX = wx + ww - 8 - 16;
@@ -182,7 +185,7 @@ public class ClickGuiScreen extends Screen {
         search = new EditBox(this.font, sbx + 18, wy + 5, 124 - 24, 16, Component.literal("Search"));
         search.setBordered(false);
         search.setTextColor(TEXT);
-        search.setHint(Component.literal("Search modules..."));
+        search.setHint(Component.literal("Szukaj modułów..."));
         search.setResponder(s -> startPage());
         addWidget(search);
 
@@ -293,7 +296,7 @@ public class ClickGuiScreen extends Screen {
         // logo + nazwa
         rr(g, wx + 8, wy + 5, 16, 16, 4, accent());
         txt(g, "K", wx + 8 + 8 - this.font.width("K") / 2, wy + 9, 0xFFFFFFFF);
-        txt(g, Krux.NAME, wx + 30, wy + 9, TEXT);
+        txt(g, "Krux", wx + 30, wy + 9, TEXT);
 
         // pozycje paska bocznego
         int y = wy + HEAD + 8;
@@ -303,7 +306,7 @@ public class ClickGuiScreen extends Screen {
             if (n.section() != lastSection) {
                 lastSection = n.section();
                 if (i != 0) y += 6;
-                txt(g, n.section() == 0 ? "MAIN" : "OTHER", wx + 12, y, DIM);
+                txt(g, n.section() == 0 ? "Główne" : "Inne", wx + 12, y, DIM);
                 y += 12;
             }
             boolean sel = i == cat && search.getValue().trim().isEmpty();
@@ -329,7 +332,7 @@ public class ClickGuiScreen extends Screen {
         String name = NameProtect.apply(Minecraft.getInstance().getUser().getName());
         if (this.font.width(name) > SB - 52) name = this.font.plainSubstrByWidth(name, SB - 52);
         txt(g, name, wx + 30, fy + 6, TEXT);
-        txt(g, Krux.shortStatus(), wx + 30, fy + 16, Krux.licensed() ? MUT : PINK);
+        txt(g, Krux.isDev() ? "Developer" : "Customer", wx + 30, fy + 16, MUT);
 
         // nagłówek: ścieżka
         int cx = wx + SB + 12;
@@ -339,7 +342,7 @@ public class ClickGuiScreen extends Screen {
             txt(g, navList.get(cat).label(), cx + 14, wy + 9, TEXT);
         } else {
             icon(g, I_SEARCH, cx, wy + 10, accent());
-            txt(g, "Search results", cx + 14, wy + 9, TEXT);
+            txt(g, "Wyniki wyszukiwania", cx + 14, wy + 9, TEXT);
         }
     }
 
@@ -350,8 +353,10 @@ public class ClickGuiScreen extends Screen {
         box(g, sbx, sby, 124, 16, 4, FIELD, focus ? accent() : BORDER);
         icon(g, I_SEARCH, sbx + 6, sby + 4, MUT);
 
-        box(g, btnX, sby, 16, 16, 5, FIELD, BORDER);
-        icon(g, I_SEARCH, btnX + 4, sby + 4, TEXT);
+        boolean rh = mx >= btnX && mx < btnX + 16 && my >= sby && my < sby + 16;
+        box(g, btnX, sby, 16, 16, 5, rh ? 0xFF2A2A31 : FIELD, BORDER);
+        icon(g, I_REFRESH, btnX + 4, sby + 4, TEXT);
+        hits.add(new Hit(Kind.REFRESH, btnX, sby, 16, 16, false, null, null, 0));
 
         search.setX(sbx + 18);
         search.setY(sby + (16 - 8) / 2 - 3);
@@ -370,9 +375,11 @@ public class ClickGuiScreen extends Screen {
         int top = by - Math.round(scroll) + yOff;
 
         if (mods.isEmpty()) {
-            String msg = navList.get(cat).id().equals("Favorites") && search.getValue().trim().isEmpty()
-                    ? "No favorites yet. Click the star on a module."
-                    : "No modules found.";
+            String id = navList.get(cat).id();
+            boolean noSearch = search.getValue().trim().isEmpty();
+            String msg = id.equals("Skrypty") && noSearch ? "Brak skryptów."
+                    : id.equals("Favorites") && noSearch ? "Nie masz jeszcze ulubionych. Kliknij gwiazdkę przy module."
+                    : "Nie znaleziono modułów.";
             txt(g, msg, bx + 4, top + 6, MUT);
             return 24;
         }
@@ -435,7 +442,7 @@ public class ClickGuiScreen extends Screen {
         icon(g, I_KEY, x + 8, yy + 4, accent());
         txt(g, "Activation Key", x + 19 + 4, yy + 4, TEXT);
         boolean wait = binding == m;
-        String kt = wait ? "Press a key..." : keyText(m);
+        String kt = wait ? "Naciśnij klawisz..." : keyText(m);
         txtR(g, kt, x + cw - 7, yy + 4, wait ? accent() : MUT);
         hits.add(new Hit(Kind.BIND, x, yy, cw, R_BIND, true, m, null, 0));
     }
@@ -575,7 +582,7 @@ public class ClickGuiScreen extends Screen {
             if (h1) rr(g, x + 2, y + 2, w - 4, 16, 3, SELBG);
             if (h2) rr(g, x + 2, y + 18, w - 4, 16, 3, SELBG);
             icon(g, I_PLUS, x + 8, y + 7, MUT);
-            txt(g, "New bind", x + 20, y + 6, TEXT);
+            txt(g, "Nowy bind", x + 20, y + 6, TEXT);
             icon(g, I_RESET, x + 8, y + 23, PINK);
             txt(g, "Reset", x + 20, y + 22, PINK);
             hits.add(new Hit(Kind.CTX_BIND, x, y + 2, w, 16, false, ctxModule, null, 0));
@@ -746,6 +753,13 @@ public class ClickGuiScreen extends Screen {
                         ((Setting.Mode) h.setting()).set(h.idx());
                         ddSetting = null;
                         StorageFinderConfig.save();
+                    }
+                }
+                case REFRESH -> {
+                    if (btn == 0) {
+                        StorageFinderConfig.load();
+                        search.setValue("");
+                        startPage();
                     }
                 }
                 case TEXT -> {

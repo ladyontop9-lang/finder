@@ -23,8 +23,22 @@ public final class Krux {
     public static final String NAME = "Krux Client";
 
     private static final java.util.Properties BUILD = loadBuild();
-    /** true tylko w jarze krux-client-1.8-developer.jar (build z -Pdev=true). */
-    public static final boolean DEV_BUILD = Boolean.parseBoolean(BUILD.getProperty("dev", "false"));
+    /** true tylko, gdy ten plik nazywa się krux-client-1.8-developer.jar (wersja dewelopera). */
+    public static final boolean DEV_BUILD = detectDev();
+
+    private static boolean detectDev() {
+        try {
+            var c = FabricLoader.getInstance().getModContainer("storagefinder").orElse(null);
+            if (c != null) {
+                for (Path p : c.getOrigin().getPaths()) {
+                    Path fn = p.getFileName();
+                    if (fn != null && fn.toString().toLowerCase().contains("developer")) return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
 
     private static java.util.Properties loadBuild() {
         java.util.Properties p = new java.util.Properties();

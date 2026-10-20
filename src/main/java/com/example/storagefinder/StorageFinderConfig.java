@@ -18,6 +18,9 @@ public final class StorageFinderConfig {
     public static final boolean[] types = new boolean[StorageType.values().length];
     public static boolean tracers = true;          // tracery do bloków
     public static int radiusChunks = 8;
+    public static boolean susEnabled = true;       // czerwony chunk przy ogromnej ilości wyrośniętego ametystu
+    public static int susThreshold = 80;           // ile wyrośniętych kryształów ametystu w chunku = "sus"
+    public static boolean susNotify = true;        // komunikat na czacie
 
     // ---- ESP ----
     public static boolean espEnabled = false;
@@ -122,6 +125,9 @@ public final class StorageFinderConfig {
             }
             tracers = b(p, "tracers", true);
             radiusChunks = Math.max(2, Math.min(16, num(p, "radius", 8)));
+            susEnabled = b(p, "susEnabled", true);
+            susThreshold = Math.max(10, Math.min(500, num(p, "susThreshold", 80)));
+            susNotify = b(p, "susNotify", true);
 
             espEnabled = b(p, "espEnabled", false);
             espPlayers = b(p, "espPlayers", true);
@@ -175,7 +181,7 @@ public final class StorageFinderConfig {
     }
 
     private static int signature() {
-        return Objects.hash(enabled, Arrays.hashCode(types), radiusChunks);
+        return Objects.hash(enabled, Arrays.hashCode(types), radiusChunks, susEnabled);
     }
 
     public static void save() {
@@ -192,6 +198,9 @@ public final class StorageFinderConfig {
             }
             p.setProperty("tracers", Boolean.toString(tracers));
             p.setProperty("radius", Integer.toString(radiusChunks));
+            p.setProperty("susEnabled", Boolean.toString(susEnabled));
+            p.setProperty("susThreshold", Integer.toString(susThreshold));
+            p.setProperty("susNotify", Boolean.toString(susNotify));
 
             p.setProperty("espEnabled", Boolean.toString(espEnabled));
             p.setProperty("espPlayers", Boolean.toString(espPlayers));
