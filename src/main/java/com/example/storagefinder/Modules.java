@@ -77,17 +77,26 @@ public final class Modules {
                 () -> StorageFinderConfig.tracers, v -> StorageFinderConfig.tracers = v));
         sf.add(new Setting.Slider("Scan range", 2, 16, 1, true,
                 () -> StorageFinderConfig.radiusChunks, v -> StorageFinderConfig.radiusChunks = (int) Math.round(v)));
-        sf.add(new Setting.Bool("Sus chunks (red)", 0xFFFF3B3B,
-                () -> StorageFinderConfig.susEnabled, v -> StorageFinderConfig.susEnabled = v));
-        sf.add(new Setting.Slider("Sus threshold", 10, 500, 5, true,
-                () -> StorageFinderConfig.susThreshold, v -> StorageFinderConfig.susThreshold = (int) Math.round(v)));
-        sf.add(new Setting.Bool("Sus chat alert", NONE,
-                () -> StorageFinderConfig.susNotify, v -> StorageFinderConfig.susNotify = v));
+
         ALL.add(new Module("Storage Finder", "Render",
-                "Finds chests, barrels, spawners, hoppers, pistons and amethyst through walls. Marks chunks with huge amounts of grown amethyst in red.",
+                "Finds chests, barrels, spawners, hoppers, pistons and amethyst through walls.",
                 new String[]{"Search", "Blocks"},
                 () -> StorageFinderConfig.enabled, v -> StorageFinderConfig.enabled = v, sf)
                 .withSuffix(() -> String.valueOf(StorageScanner.found().size())));
+
+        ALL.add(new Module("Sus Chunk", "Render",
+                "Marks a chunk in red when it holds a huge amount of fully grown amethyst.",
+                new String[]{"Chunks", "Amethyst"},
+                () -> StorageFinderConfig.susEnabled, v -> StorageFinderConfig.susEnabled = v, List.of(
+                new Setting.Slider("Threshold", 10, 500, 5, true,
+                        () -> StorageFinderConfig.susThreshold, v -> StorageFinderConfig.susThreshold = (int) Math.round(v)),
+                new Setting.Slider("Scan range", 2, 16, 1, true,
+                        () -> StorageFinderConfig.susRange, v -> StorageFinderConfig.susRange = (int) Math.round(v)),
+                new Setting.Bool("Tracers", NONE,
+                        () -> StorageFinderConfig.susTracers, v -> StorageFinderConfig.susTracers = v),
+                new Setting.Bool("Chat alert", NONE,
+                        () -> StorageFinderConfig.susNotify, v -> StorageFinderConfig.susNotify = v)
+        )).withSuffix(() -> String.valueOf(StorageScanner.sus().size())));
 
         ALL.add(new Module("ESP", "Render",
                 "Boxes around players and mobs, visible through walls.",

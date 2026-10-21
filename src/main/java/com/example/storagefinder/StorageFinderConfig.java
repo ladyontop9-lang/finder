@@ -18,7 +18,9 @@ public final class StorageFinderConfig {
     public static final boolean[] types = new boolean[StorageType.values().length];
     public static boolean tracers = true;          // tracery do bloków
     public static int radiusChunks = 8;
-    public static boolean susEnabled = true;       // czerwony chunk przy ogromnej ilości wyrośniętego ametystu
+    public static boolean susEnabled = false;      // moduł Sus Chunk: czerwony chunk przy ogromnej ilości wyrośniętego ametystu
+    public static int susRange = 8;                // zasięg skanowania Sus Chunk (chunki)
+    public static boolean susTracers = true;       // linia do sus chunka
     public static int susThreshold = 80;           // ile wyrośniętych kryształów ametystu w chunku = "sus"
     public static boolean susNotify = true;        // komunikat na czacie
 
@@ -125,7 +127,9 @@ public final class StorageFinderConfig {
             }
             tracers = b(p, "tracers", true);
             radiusChunks = Math.max(2, Math.min(16, num(p, "radius", 8)));
-            susEnabled = b(p, "susEnabled", true);
+            susEnabled = b(p, "susEnabled", false);
+            susRange = Math.max(2, Math.min(16, num(p, "susRange", 8)));
+            susTracers = b(p, "susTracers", true);
             susThreshold = Math.max(10, Math.min(500, num(p, "susThreshold", 80)));
             susNotify = b(p, "susNotify", true);
 
@@ -181,7 +185,7 @@ public final class StorageFinderConfig {
     }
 
     private static int signature() {
-        return Objects.hash(enabled, Arrays.hashCode(types), radiusChunks, susEnabled);
+        return Objects.hash(enabled, Arrays.hashCode(types), radiusChunks, susEnabled, susRange);
     }
 
     public static void save() {
@@ -199,6 +203,8 @@ public final class StorageFinderConfig {
             p.setProperty("tracers", Boolean.toString(tracers));
             p.setProperty("radius", Integer.toString(radiusChunks));
             p.setProperty("susEnabled", Boolean.toString(susEnabled));
+            p.setProperty("susRange", Integer.toString(susRange));
+            p.setProperty("susTracers", Boolean.toString(susTracers));
             p.setProperty("susThreshold", Integer.toString(susThreshold));
             p.setProperty("susNotify", Boolean.toString(susNotify));
 

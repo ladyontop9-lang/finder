@@ -16,7 +16,7 @@ import java.util.Base64;
 
 /**
  * Licencje podpisane Ed25519 (czysta Java, bez Minecrafta).
- * Klucz publiczny jest w modzie, prywatny zostaje tylko u Ciebie (dev.key) — bez prywatnego klucza
+ * Klucz publiczny jest w modzie, prywatny jest tylko w jarze developer — bez prywatnego klucza
  * nie da się wygenerować działającej licencji.
  *
  * Format klucza: KRUX-XXXXXXXX-XXXXXXXX-... (Base32 z 80 bajtów: 16 bajtów danych + 64 bajty podpisu).

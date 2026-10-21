@@ -72,7 +72,8 @@ public final class StorageRenderer {
         boolean sf = StorageFinderConfig.enabled;
         boolean esp = StorageFinderConfig.espEnabled;
         boolean tr = StorageFinderConfig.tracersEnabled;
-        if (!sf && !esp && !tr) return;
+        boolean susOn = StorageFinderConfig.susEnabled;
+        if (!sf && !esp && !tr && !susOn) return;
 
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
@@ -80,16 +81,16 @@ public final class StorageRenderer {
 
         java.util.List<StorageScanner.Entry> entries = sf ? StorageScanner.found() : java.util.List.of();
         java.util.List<StorageScanner.Target> targets = (esp || tr) ? StorageScanner.targets() : java.util.List.of();
-        java.util.List<StorageScanner.SusChunk> susList = (sf && StorageFinderConfig.susEnabled)
-                ? StorageScanner.sus() : java.util.List.of();
+        java.util.List<StorageScanner.SusChunk> susList = susOn ? StorageScanner.sus() : java.util.List.of();
         if (entries.isEmpty() && targets.isEmpty() && susList.isEmpty()) return;
 
         boolean blockTracers = sf && StorageFinderConfig.tracers;
+        boolean susTracers = susOn && StorageFinderConfig.susTracers;
         float pt = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         float thick = (float) StorageFinderConfig.tracerThickness;
 
         Vec3 look = null;
-        if (blockTracers || tr) {
+        if (blockTracers || tr || susTracers) {
             var viewer = mc.getCameraEntity() != null ? mc.getCameraEntity() : mc.player;
             look = viewer.getViewVector(pt);
         }
@@ -123,7 +124,7 @@ public final class StorageRenderer {
             float sx = sc.cx() * 16f, sz = sc.cz() * 16f;
             float sy0 = sc.minY() - 1f, sy1 = sc.maxY() + 2f;
             renderFilledBox(pose, buffer, sx, sy0, sz, sx + 16f, sy1, sz + 16f, 1f, 0.08f, 0.08f, 0.22f);
-            if (blockTracers) {
+            if (susTracers) {
                 renderTracer(pose, buffer, camera, look, sx + 8.0, (sy0 + sy1) / 2.0, sz + 8.0,
                         1f, 0.15f, 0.15f, 0.9f, thick);
             }

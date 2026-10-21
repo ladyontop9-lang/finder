@@ -114,8 +114,10 @@ public final class StorageScanner {
         boolean force = rescan;
         rescan = false;
 
-        // ---------------- Storage Finder ----------------
-        if (StorageFinderConfig.enabled) {
+        // ---------------- Storage Finder + Sus Chunk (wspólny skaner bloków) ----------------
+        boolean wantSf = StorageFinderConfig.enabled;
+        boolean wantSus = StorageFinderConfig.susEnabled;
+        if (wantSf || wantSus) {
             if (force) {
                 blockCache.clear();
                 startCycleNow = true;
@@ -123,8 +125,12 @@ public final class StorageScanner {
             }
             boolean changed = false;
 
-            if (force || tickCounter % 2 == 0) {
+            if (wantSf && (force || tickCounter % 2 == 0)) {
                 scanBlockEntities(mc, level);
+                changed = true;
+            } else if (!wantSf && !beEntries.isEmpty()) {
+                beEntries = List.of();
+                beCounts = new int[N];
                 changed = true;
             }
             boolean blocksChanged = false;
@@ -142,12 +148,16 @@ public final class StorageScanner {
             if (blocksChanged || susDirty) rebuildSus(mc);
 
             if (changed) {
-                List<Entry> merged = new ArrayList<>(beEntries.size() + blockEntries.size());
-                merged.addAll(beEntries);
-                merged.addAll(blockEntries);
-                found = merged;
+                if (wantSf) {
+                    List<Entry> merged = new ArrayList<>(beEntries.size() + blockEntries.size());
+                    merged.addAll(beEntries);
+                    merged.addAll(blockEntries);
+                    found = merged;
+                } else {
+                    found = List.of();
+                }
             }
-        } else if (!found.isEmpty()) {
+        } else if (!found.isEmpty() || !sus.isEmpty()) {
             clearStorage();
         }
 
@@ -204,11 +214,19 @@ public final class StorageScanner {
         };
     }
 
+    /** Promień skanowania bloków: większy z zasięgów włączonych modułów (Storage Finder / Sus Chunk). */
+    private static int scanRadius() {
+        int r = 2;
+        if (StorageFinderConfig.enabled) r = Math.max(r, StorageFinderConfig.radiusChunks);
+        if (StorageFinderConfig.susEnabled) r = Math.max(r, StorageFinderConfig.susRange);
+        return r;
+    }
+
     private static void rebuildBlockTypes() {
         Map<Block, StorageType> m = new HashMap<>();
         for (StorageType t : StorageType.values()) {
             Block b = blockFor(t);
-            boolean need = StorageFinderConfig.isOn(t)
+            boolean need = (StorageFinderConfig.enabled && StorageFinderConfig.isOn(t))
                     || (t == StorageType.AMETHYST && StorageFinderConfig.susEnabled);
             if (b != null && need) m.put(b, t);
         }
@@ -243,7 +261,7 @@ public final class StorageScanner {
             startCycleNow = false;
 
             ChunkPos center = mc.player.chunkPosition();
-            int r = Math.min(StorageFinderConfig.radiusChunks, mc.options.renderDistance().get());
+            int r = Math.min(scanRadius(), mc.options.renderDistance().get());
             queue = buildQueue(center, r);
             qIndex = 0;
             rebuildBlockTypes();
@@ -277,7 +295,8 @@ public final class StorageScanner {
             int[] cnt = new int[N];
             for (List<Entry> l : blockCache.values()) {
                 for (Entry e : l) {
-                    if (e.type() == StorageType.AMETHYST && !StorageFinderConfig.isOn(StorageType.AMETHYST)) continue;
+                    if (e.type() == StorageType.AMETHYST
+                            && !(StorageFinderConfig.enabled && StorageFinderConfig.isOn(StorageType.AMETHYST))) continue;
                     merged.add(e);
                     cnt[e.type().ordinal()]++;
                 }

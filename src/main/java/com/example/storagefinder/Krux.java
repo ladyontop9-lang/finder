@@ -1,5 +1,6 @@
 package com.example.storagefinder;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -7,6 +8,7 @@ import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Properties;
 
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
@@ -15,42 +17,22 @@ import net.minecraft.client.gui.screens.TitleScreen;
 
 /**
  * Stan licencji Krux Client.
- * - Klucz licencji jest zapamiętywany na stałe w config/krux/license.key.
- * - Licencja timed (np. miesięczna) wygasa po dacie z klucza; lifetime nie wygasa.
- * - Tryb dewelopera włącza się, gdy w config/krux/dev.key leży Twój klucz prywatny pasujący do klucza w modzie.
+ *
+ * - Klient: wpisuje klucz licencji RAZ; zapamiętuje się na stałe w config/krux/license.key
+ *   (poza jarem, więc aktualizacje moda nie kasują licencji).
+ * - Wersja developer (krux-client-1.8-developer.jar) zawiera wbudowane narzędzie do podpisywania licencji
+ *   i ma zawsze pełny dostęp. Nie ma żadnych dodatkowych plików z kluczami.
  */
 public final class Krux {
     public static final String NAME = "Krux Client";
 
-    private static final java.util.Properties BUILD = loadBuild();
-    /** true tylko, gdy ten plik nazywa się krux-client-1.8-developer.jar (wersja dewelopera). */
-    public static final boolean DEV_BUILD = detectDev();
-
-    private static boolean detectDev() {
-        try {
-            var c = FabricLoader.getInstance().getModContainer("storagefinder").orElse(null);
-            if (c != null) {
-                for (Path p : c.getOrigin().getPaths()) {
-                    Path fn = p.getFileName();
-                    if (fn != null && fn.toString().toLowerCase().contains("developer")) return true;
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        return false;
-    }
-
-    private static java.util.Properties loadBuild() {
-        java.util.Properties p = new java.util.Properties();
-        try (java.io.InputStream in = Krux.class.getResourceAsStream("/krux_build.properties")) {
-            if (in != null) p.load(in);
-        } catch (Exception ignored) {
-        }
-        return p;
-    }
+    private static final Properties BUILD = loadBuild();
+    /** Klucz do podpisywania — istnieje WYŁĄCZNIE w jarze developer. */
+    private static final String DEV_PRIVATE = loadDevPrivate();
+    /** true w krux-client-1.8-developer.jar. */
+    public static final boolean DEV_BUILD = DEV_PRIVATE != null;
 
     private static boolean licensed = false;
-    private static boolean dev = false;
     private static boolean promptShown = false;
     private static KruxLicense.Info info = null;
     private static String status = "No license";
@@ -58,27 +40,38 @@ public final class Krux {
 
     private Krux() {}
 
+    private static Properties loadBuild() {
+        Properties p = new Properties();
+        try (InputStream in = Krux.class.getResourceAsStream("/krux_build.properties")) {
+            if (in != null) p.load(in);
+        } catch (Exception ignored) {
+        }
+        return p;
+    }
+
+    private static String loadDevPrivate() {
+        try (InputStream in = Krux.class.getResourceAsStream("/krux_dev_private.key")) {
+            if (in == null) return null;
+            String s = new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
+            return s.isEmpty() ? null : s;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     // ------------------------------------------------------------------ ścieżki
 
     private static Path dir() { return FabricLoader.getInstance().getConfigDir().resolve("krux"); }
     private static Path licenseFile() { return dir().resolve("license.key"); }
-    private static Path devKeyFile() { return dir().resolve("dev.key"); }
     private static Path stateFile() { return dir().resolve("state.dat"); }
     private static Path issuedLog() { return dir().resolve("issued.log"); }
-
-    /** dev.key: pierwsza linia = klucz prywatny, druga = klucz publiczny (Base64). */
-    private static String[] devKeyLines() throws Exception {
-        String[] lines = Files.readString(devKeyFile()).trim().split("\\R");
-        return new String[]{lines[0].trim(), lines.length > 1 ? lines[1].trim() : ""};
-    }
 
     private static long today() { return LocalDate.now(ZoneOffset.UTC).toEpochDay(); }
 
     // ------------------------------------------------------------------ stan
 
-    /** Wersja developer (krux-client-1.8-developer.jar) zawsze ma pełny dostęp — bez licencji i bez dev.key. */
-    public static boolean licensed() { return licensed || dev || DEV_BUILD; }
-    public static boolean isDev() { return dev; }
+    /** Wersja developer zawsze ma pełny dostęp. */
+    public static boolean licensed() { return licensed || DEV_BUILD; }
     public static String status() { return status; }
     public static KruxLicense.Info info() { return info; }
 
@@ -91,7 +84,7 @@ public final class Krux {
         }
     }
 
-    /** Wersja tego jara (zawiera skrót commita z GitHuba, np. 1.8.1+b40789a). */
+    /** Wersja tego jara (np. 1.8.0 DEV #b40789a). */
     public static String buildId() {
         String ver = "?";
         try {
@@ -102,59 +95,20 @@ public final class Krux {
         return ver + (DEV_BUILD ? " DEV" : "") + " #" + BUILD.getProperty("build", "local");
     }
 
-    /** Krótki status klucza publicznego zapisanego w TYM jarze. */
     public static String keyStatus() {
-        String k = KruxPublicKey.PUBLIC_KEY;
-        if (k == null || k.contains("PASTE_YOUR")) return "NOT SET";
-        try {
-            KruxLicense.decodePublic(k);
-            return "OK";
-        } catch (Exception e) {
-            return "INVALID";
-        }
+        return configured() ? "OK" : "NOT SET";
     }
 
-    /** Szczegóły do diagnozy (klucz publiczny nie jest tajny). */
-    public static String keyDetail() {
-        String k = KruxPublicKey.PUBLIC_KEY == null ? "" : KruxPublicKey.PUBLIC_KEY;
-        if (k.contains("PASTE_YOUR")) return "This jar still has the placeholder key. Paste your public key and build again.";
-        String head = k.substring(0, Math.min(12, k.length()));
-        try {
-            KruxLicense.decodePublic(k);
-            return "Public key OK: " + head + "... (" + k.length() + " chars)";
-        } catch (Exception e) {
-            return "Public key INVALID: " + head + "... (" + k.length() + " chars). Expected ~60 chars starting with MCowBQYDK2VwAyEA.";
-        }
-    }
-
-    /** "none" (brak dev.key), "match" (pasuje do klucza w jarze / tryb konfiguracji), "mismatch" (inny klucz). */
-    public static String devKeyState() {
-        if (!DEV_BUILD || !hasPrivateKey()) return "none";
-        if (!configured()) return "match";
-        try {
-            return KruxLicense.keysMatch(devKeyLines()[0], KruxPublicKey.PUBLIC_KEY) ? "match" : "mismatch";
-        } catch (Exception e) {
-            return "mismatch";
-        }
-    }
-
-    public static boolean hasPrivateKey() { return Files.exists(devKeyFile()); }
-
-    /** Build bez wklejonego klucza publicznego i bez klucza dewelopera = trzeba przejść konfigurację. */
-    public static boolean needsSetup() { return DEV_BUILD && !configured() && !hasPrivateKey(); }
-
-    /** Opis licencji do pokazania w oknie. */
     public static String describe() {
-        if (dev || DEV_BUILD) return "Developer mode";
+        if (DEV_BUILD) return "Developer version";
         if (!licensed || info == null) return status;
         if (info.lifetime()) return "Lifetime license";
         long left = info.expiryDay() - today();
         return "Expires " + LocalDate.ofEpochDay(info.expiryDay()) + " (" + Math.max(0, left) + " days left)";
     }
 
-    /** Krótki opis do paska bocznego. */
     public static String shortStatus() {
-        if (dev) return "Developer";
+        if (DEV_BUILD) return "Developer";
         if (!licensed || info == null) return "Not licensed";
         if (info.lifetime()) return "Lifetime";
         return Math.max(0, info.expiryDay() - today()) + " days left";
@@ -163,26 +117,16 @@ public final class Krux {
     // ------------------------------------------------------------------ ładowanie i aktywacja
 
     public static void load() {
-        dev = false;
         licensed = false;
         info = null;
-
-        try {
-            if (DEV_BUILD && hasPrivateKey()) {
-                String priv = devKeyLines()[0];
-                dev = !configured() || KruxLicense.keysMatch(priv, KruxPublicKey.PUBLIC_KEY);
-            }
-        } catch (Exception ignored) {
-        }
-        if (dev) {
-            status = "Developer mode";
+        if (DEV_BUILD) {
+            status = "Developer version";
             return;
         }
         if (!configured()) {
             status = "License system is not configured";
             return;
         }
-
         try {
             if (Files.exists(licenseFile())) {
                 String err = apply(Files.readString(licenseFile()).trim(), false);
@@ -253,61 +197,47 @@ public final class Krux {
         }
     }
 
-    // ------------------------------------------------------------------ narzędzia dewelopera
+    // ------------------------------------------------------------------ wystawianie licencji (tylko wersja developer)
 
-    /** Tworzy parę kluczy; prywatny trafia do dev.key, zwraca klucz publiczny (do wklejenia w KruxPublicKey). */
-    public static String generateKeys() throws Exception {
-        KruxLicense.KeyPairB64 kp = KruxLicense.generateKeyPair();
-        Files.createDirectories(dir());
-        if (hasPrivateKey()) {   // nigdy nie kasujemy starego klucza — robimy kopię
-            Files.copy(devKeyFile(), dir().resolve("dev.key." + (System.currentTimeMillis() / 1000) + ".bak"));
-        }
-        Files.writeString(devKeyFile(), kp.privateKey() + System.lineSeparator() + kp.publicKey(), StandardCharsets.UTF_8);
-        load();
-        return kp.publicKey();
-    }
-
-    /** Klucz publiczny zapisany w dev.key (do wklejenia w KruxPublicKey.java). */
-    public static String devPublicKey() {
-        try {
-            return devKeyLines()[1];
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    /** Wystawia licencję: days <= 0 => lifetime. */
+    /** Wystawia licencję: lifetime albo na podaną liczbę dni. Zwraca gotowy klucz dla klienta. */
     public static String issue(boolean lifetime, int days, String note) throws Exception {
-        if (!hasPrivateKey()) throw new IllegalStateException("No dev.key");
-        String priv = devKeyLines()[0];
+        if (DEV_PRIVATE == null) throw new IllegalStateException("This is not the developer version.");
         long today = today();
         long expiry = lifetime ? 0 : today + Math.max(1, days);
-        String token = KruxLicense.create(priv, lifetime ? KruxLicense.LIFETIME : KruxLicense.TIMED, today, expiry);
+        String token = KruxLicense.create(DEV_PRIVATE, lifetime ? KruxLicense.LIFETIME : KruxLicense.TIMED, today, expiry);
 
+        // kontrola: podpis musi pasować do klucza publicznego wbudowanego w jary klientów
         KruxLicense.Check c = KruxLicense.verify(token, KruxPublicKey.PUBLIC_KEY, today);
-        String id = c.info() != null ? c.info().id() : "?";
-        String line = Instant.now() + " | " + id + " | " + (lifetime ? "LIFETIME" : "TIMED until " + LocalDate.ofEpochDay(expiry))
+        if (c.result() != KruxLicense.Result.VALID) {
+            throw new IllegalStateException("Signing key does not match KruxPublicKey.java");
+        }
+
+        String line = Instant.now() + " | " + c.info().id() + " | "
+                + (lifetime ? "LIFETIME" : "TIMED until " + LocalDate.ofEpochDay(expiry))
                 + (note == null || note.isBlank() ? "" : " | " + note.trim()) + System.lineSeparator();
-        Files.createDirectories(dir());
-        Files.writeString(issuedLog(), line, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        try {
+            Files.createDirectories(dir());
+            Files.writeString(issuedLog(), line, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (Exception ignored) {
+        }
         return token;
     }
 
     // ------------------------------------------------------------------ integracja z grą
 
     public static Screen gateScreen(Screen parent) {
-        return needsSetup() ? new KruxDevScreen(parent) : new LicenseScreen(parent);
+        return new LicenseScreen(parent);
     }
 
     public static void tick(Minecraft mc) {
         // wygaśnięcie licencji czasowej w trakcie gry
-        if (++tickCounter % 1200 == 0 && licensed && !dev && info != null && !info.lifetime() && today() > info.expiryDay()) {
+        if (++tickCounter % 1200 == 0 && licensed && info != null && !info.lifetime() && today() > info.expiryDay()) {
             licensed = false;
             status = "License expired";
             for (Module m : Modules.ALL) m.setEnabled(false);
         }
 
-        // ekran licencji przy pierwszym wejściu na ekran tytułowy
+        // okno licencji przy pierwszym wejściu na ekran tytułowy
         if (!licensed() && !promptShown && mc.screen instanceof TitleScreen) {
             promptShown = true;
             mc.setScreen(gateScreen(mc.screen));

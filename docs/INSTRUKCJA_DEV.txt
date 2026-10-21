@@ -2,21 +2,23 @@ KRUX CLIENT - INSTRUKCJA DLA DEWELOPERA
 
 JEDEN BUILD NA GITHUBIE (Actions -> Artifacts -> krux-client) DAJE DWA PLIKI:
   krux-client-1.8.jar            - WERSJA DLA KLIENTOW (to wysylasz kupujacym; okno z licencja, wpisuje sie raz)
-  krux-client-1.8-developer.jar  - WERSJA DLA CIEBIE (konfigurator licencji; nie rozdawaj!)
+  krux-client-1.8-developer.jar  - WERSJA DLA CIEBIE (pelny dostep + generator licencji; nie rozdawaj!)
 
-Wersja developer (nazwa pliku "...-developer.jar") ma ZAWSZE pelny dostep - bez licencji i bez dev.key.
-dev.key (klucz prywatny w <folder gry>\config\krux\dev.key) jest potrzebny TYLKO do wystawiania licencji
-(zakladka Developer). Do mods wrzucaj JEDEN z jarow naraz. Nie wysylaj wersji developer nikomu.
+Nie ma zadnych plikow dev.key. Wersja developer ma klucz do podpisywania WBUDOWANY.
+Do mods wrzucaj JEDEN z jarow naraz.
 
 JAK WYSTAWIC LICENCJE
-1. Wrzuc krux-client-1.8-developer.jar do mods (dev.key w config\krux).
+1. Wrzuc krux-client-1.8-developer.jar do mods.
 2. K -> panel boczny -> Developer.
-3. Lifetime / 30 days / Custom, notatka, "Generate license" -> klucz w schowku i w issued.log.
-4. Wyslij klientowi klucz + krux-client-1.8.jar + INSTRUKCJA_KLIENT.txt.
+3. Lifetime / 30 days / Custom (liczba dni), notatka (np. nick kupujacego) -> "Generate license".
+4. Klucz jest w schowku i w config\krux\issued.log. Wyslij go klientowi razem z krux-client-1.8.jar
+   i INSTRUKCJA_KLIENT.txt.
 
 AKTUALIZACJE (licencje zostaja)
-- Licencja klienta jest zapisana poza jarem: config\krux\license.key. Podmiana jara na nowszy jej nie usuwa.
-- Klucze sa podpisane Twoim kluczem prywatnym; dopoki w KruxPublicKey.java zostaje TEN SAM klucz publiczny
-  (i nie generujesz nowej pary kluczy), wszystkie wystawione licencje dzialaja w kazdej nowej wersji.
-- Na GitHubie wgrywasz zmiany, pobierasz oba jary z Actions i wysylasz klientom nowy krux-client-1.8.jar.
-- NIE ruszaj KruxPublicKey.java ani dev.key.
+- Licencja klienta jest zapisana poza jarem (config\krux\license.key). Podmiana jara jej nie usuwa.
+- Dopoki NIE zmieniasz klucza publicznego w KruxPublicKey.java i klucza w folderze dev-secret,
+  wszystkie wystawione licencje dzialaja w kazdej nowej wersji.
+
+BEZPIECZENSTWO
+- Repozytorium MUSI byc prywatne (folder dev-secret zawiera klucz do podpisywania).
+- Nie wysylaj nikomu wersji developer.

@@ -55,12 +55,17 @@ java {
 }
 
 // Jeden build = DWA pliki w build/libs:
-//   krux-client-1.8.jar            (wersja dla klientów)
-//   krux-client-1.8-developer.jar  (wersja dla dewelopera: ta sama zawartość, tryb dewelopera włącza nazwa pliku + dev.key)
-tasks.register('developerJar', Copy) {
-    from tasks.named('remapJar')
-    into layout.buildDirectory.dir("libs")
-    rename { String name -> "krux-client-1.8-developer.jar" }
+//   krux-client-1.8.jar            (wersja dla klientów — bez klucza do podpisywania)
+//   krux-client-1.8-developer.jar  (to samo + wbudowany klucz do generowania licencji; tylko dla Ciebie)
+tasks.register('developerJar', Zip) {
+    def rj = tasks.named('remapJar')
+    dependsOn rj
+    archiveFileName = "krux-client-1.8-developer.jar"
+    destinationDirectory = layout.buildDirectory.dir("libs")
+    from(zipTree(rj.flatMap { it.archiveFile }))
+    from('dev-secret') {
+        include 'krux_dev_private.key'
+    }
 }
 tasks.named('assemble') {
     dependsOn 'developerJar'
