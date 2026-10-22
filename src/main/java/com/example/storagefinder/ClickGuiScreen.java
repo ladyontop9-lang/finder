@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.mojang.blaze3d.platform.InputConstants;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -19,9 +20,9 @@ import net.minecraft.network.chat.Component;
  * z ustawieniami w środku, gwiazdki ulubionych, menu prawego przycisku (New bind / Reset).
  */
 public class ClickGuiScreen extends Screen {
-    private static final int WINBG = 0xFF111114, SIDEBG = 0xFF131316, BORDER = 0xFF26262B, CARDBG = 0xFF16161A,
-            FIELD = 0xFF202025, TEXT = 0xFFF0F0F5, MUT = 0xFF8A8A94, DIM = 0xFF55555E, TAGBG = 0xFF1F1F24,
-            TRACK = 0xFF2A2A30, SELBG = 0xFF1D1D22, HOVBG = 0xFF18181C, VEIL = 0x70000000, PINK = 0xFFF08CA0;
+    private static final int WINBG = 0xFF15181C, SIDEBG = 0xFF13161A, BORDER = 0xFF222830, CARDBG = 0xFF171B20,
+            FIELD = 0xFF1B2026, TEXT = 0xFFF4F7FA, MUT = 0xFFA3ABB3, DIM = 0xFF4A535C, TAGBG = 0xFF1C2229,
+            TRACK = 0xFF272E36, SELBG = 0xFF1A2027, HOVBG = 0xFF181D23, VEIL = 0x70000000, PINK = 0xFFF08CA0;
 
     private static final int SB = 108, HEAD = 26, GAPC = 8;
     private static final int HEAD_H = 20, TAG_H = 18, PAD_TOP = 4, PAD_BOT = 4;
@@ -41,6 +42,7 @@ public class ClickGuiScreen extends Screen {
     private static final String[] I_COLOR = {".#####.", "#.....#", "#.###.#", "#.###.#", "#.###.#", "#.....#", ".#####."};
     private static final String[] I_REFRESH = {".###.#.", "#...##.", "#....#.", "#......", "#.....#", ".#...#.", "..###.."};
     private static final String[] I_SCRIPT = {".#####.", "#.....#", "#.#.#.#", "#..#..#", "#.#.#.#", "#.....#", ".#####."};
+    private static final String[] I_K = {"###....###", "###...###.", "###..###..", "###.###...", "######....", "######....", "###.###...", "###..###..", "###...###.", "###....###"};
     private static final String[] I_PLUS = {"..#..", "..#..", "#####", "..#..", "..#.."};
     private static final String[] I_RESET = {".###.", "#...#", "#....", "#...#", ".###."};
 
@@ -51,7 +53,6 @@ public class ClickGuiScreen extends Screen {
             new Nav("Movement", "Movement", I_MOVE, 0),
             new Nav("Misc", "Misc", I_MISC, 0),
             new Nav("Render", "Render", I_RENDER, 0),
-            new Nav("Skrypty", "Skrypty", I_SCRIPT, 1),
             new Nav("Favorites", "Ulubione", I_STAR, 1)
     };
 
@@ -294,9 +295,11 @@ public class ClickGuiScreen extends Screen {
         fill(g, wx + SB + 1, wy + HEAD, wx + ww, wy + HEAD + 1, BORDER);
 
         // logo + nazwa
-        rr(g, wx + 8, wy + 5, 16, 16, 4, accent());
-        txt(g, "K", wx + 8 + 8 - this.font.width("K") / 2, wy + 9, 0xFFFFFFFF);
-        txt(g, "Krux", wx + 30, wy + 9, TEXT);
+        rr(g, wx + 8, wy + 4, 18, 18, 5, accent());
+        icon(g, I_K, wx + 8 + 4, wy + 4 + 4, 0xFFFFFFFF);
+        Component krux = Component.literal("Krux").withStyle(ChatFormatting.BOLD);
+        g.drawString(this.font, krux, wx + 32, wy + 9, c(TEXT));
+        txt(g, "Client", wx + 32 + this.font.width(krux) + 4, wy + 9, MUT);
 
         // pozycje paska bocznego
         int y = wy + HEAD + 8;
@@ -311,7 +314,10 @@ public class ClickGuiScreen extends Screen {
             }
             boolean sel = i == cat && search.getValue().trim().isEmpty();
             boolean hover = mx >= wx + 6 && mx < wx + SB - 6 && my >= y && my < y + 18;
-            if (sel) box(g, wx + 6, y, SB - 12, 18, 4, SELBG, BORDER);
+            if (sel) {
+                box(g, wx + 6, y, SB - 12, 18, 4, SELBG, BORDER);
+                fill(g, wx + 7, y + 3, wx + 9, y + 15, accent());
+            }
             else if (hover) rr(g, wx + 6, y, SB - 12, 18, 4, HOVBG);
             icon(g, n.icon(), wx + 13, y + 4, sel ? accent() : MUT);
             txt(g, n.label(), wx + 27, y + 5, sel ? TEXT : MUT);
@@ -377,8 +383,7 @@ public class ClickGuiScreen extends Screen {
         if (mods.isEmpty()) {
             String id = navList.get(cat).id();
             boolean noSearch = search.getValue().trim().isEmpty();
-            String msg = id.equals("Skrypty") && noSearch ? "Brak skryptów."
-                    : id.equals("Favorites") && noSearch ? "Nie masz jeszcze ulubionych. Kliknij gwiazdkę przy module."
+            String msg = id.equals("Favorites") && noSearch ? "Nie masz jeszcze ulubionych. Kliknij gwiazdkę przy module."
                     : "Nie znaleziono modułów.";
             txt(g, msg, bx + 4, top + 6, MUT);
             return 24;
@@ -400,7 +405,9 @@ public class ClickGuiScreen extends Screen {
     }
 
     private void drawCard(GuiGraphics g, Module m, int x, int y, int cw, int ch, int mx, int my, boolean inView) {
-        box(g, x, y, cw, ch, 5, CARDBG, BORDER);
+        int tint = lerp(BORDER, accent(), 0.45f * m.onAnim);
+        box(g, x, y, cw, ch, 5, CARDBG, tint);
+        if (m.onAnim > 0.02f) fill(g, x, y + 2, x + 2, y + HEAD_H - 2, lerp(BORDER, accent(), m.onAnim));
 
         // nagłówek karty
         icon(g, iconFor(m.category), x + 7, y + 6, accent());

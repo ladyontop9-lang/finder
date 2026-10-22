@@ -46,7 +46,7 @@ public final class StorageFinderConfig {
     public static boolean alSuffix = true;
     public static int alColorMode = 2;             // 0 Static, 1 Rainbow, 2 Gradient
     public static int alSort = 0;                  // 0 Length, 1 A-Z
-    public static int accent = 0xA78BFA;
+    public static int accent = 0x4FB3E8;
 
     // ---- nowe moduły ----
     public static int zoomFov = 30;
@@ -152,7 +152,7 @@ public final class StorageFinderConfig {
             alSuffix = b(p, "alSuffix", true);
             alColorMode = Math.max(0, Math.min(2, num(p, "alColorMode", 2)));
             alSort = Math.max(0, Math.min(1, num(p, "alSort", 0)));
-            accent = num(p, "accent", 0xA78BFA) & 0xFFFFFF;
+            accent = num(p, "accent", 0x4FB3E8) & 0xFFFFFF;
             zoomFov = Math.max(30, Math.min(90, num(p, "zoomFov", 30)));
             npEnabled = b(p, "npEnabled", false);
             npName = p.getProperty("npName", "Krux");

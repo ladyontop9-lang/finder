@@ -10,8 +10,8 @@ public final class Modules {
     private static final int MOB = 0xFFFF5555;
     private static final int PASSIVE = 0xFF58D68D;
 
-    public static final String[] ACCENT_NAMES = {"Violet", "Blue", "Redstone", "Diamond", "Emerald", "Gold"};
-    public static final int[] ACCENT_COLORS = {0xA78BFA, 0x3D8BFF, 0xFF4B4B, 0x45E0E6, 0x3FE07D, 0xFFC73A};
+    public static final String[] ACCENT_NAMES = {"Ice", "Crimson", "Emerald", "Violet", "Gold", "Diamond"};
+    public static final int[] ACCENT_COLORS = {0x4FB3E8, 0xE5484D, 0x34C985, 0x9D86EA, 0xFFC73A, 0x45E0E6};
 
     public static final List<String> CATEGORIES = List.of("Combat", "Movement", "Misc", "Render");
     public static final List<Module> ALL = new ArrayList<>();

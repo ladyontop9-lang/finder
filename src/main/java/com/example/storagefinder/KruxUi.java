@@ -5,8 +5,8 @@ import net.minecraft.client.gui.GuiGraphics;
 
 /** Wspólny styl okien Krux (licencja, narzędzia dewelopera). */
 final class KruxUi {
-    static final int WINBG = 0xFF111114, BORDER = 0xFF26262B, FIELD = 0xFF202025, TEXT = 0xFFF0F0F5,
-            MUT = 0xFF8A8A94, DIM = 0xFF55555E, GREEN = 0xFF3DD68C, RED = 0xFFF0707A, VEIL = 0x90000000;
+    static final int WINBG = 0xFF15181C, BORDER = 0xFF222830, FIELD = 0xFF1B2026, TEXT = 0xFFF4F7FA,
+            MUT = 0xFFA3ABB3, DIM = 0xFF4A535C, GREEN = 0xFF3DD68C, RED = 0xFFF0707A, VEIL = 0x90000000;
 
     private KruxUi() {}
 
