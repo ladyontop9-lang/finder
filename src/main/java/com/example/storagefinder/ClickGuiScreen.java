@@ -24,9 +24,13 @@ public class ClickGuiScreen extends Screen {
             FIELD = 0xFF1B2026, TEXT = 0xFFF4F7FA, MUT = 0xFFA3ABB3, DIM = 0xFF4A535C, TAGBG = 0xFF1C2229,
             TRACK = 0xFF272E36, SELBG = 0xFF1A2027, HOVBG = 0xFF181D23, VEIL = 0x70000000, PINK = 0xFFF08CA0;
 
-    private static final int SB = 108, HEAD = 26, GAPC = 8;
-    private static final int HEAD_H = 20, TAG_H = 18, PAD_TOP = 4, PAD_BOT = 4;
-    private static final int R_BOOL = 16, R_MODE = 30, R_SLIDER = 22, R_COLOR = 44, R_SWATCH = 26, R_BIND = 16, R_TEXT = 30;
+    // Wszystkie wymiary pochodzą z projektu 1376x868 (jak w podglądzie krux-gui-v2) i są skalowane do okna w grze.
+    private float scl = 0.5f;
+    private int SB, HEAD, GAPC, HEAD_H, TAG_H, PAD_TOP, PAD_BOT;
+    private int LBL, FLD, CR;
+    private int R_BOOL, R_MODE, R_SLIDER, R_COLOR, R_SWATCH, R_BIND, R_TEXT;
+
+    private int u(double d) { return (int) Math.round(d * scl); }
 
     // ---- ikony 9x9 / 7x7 (piksele) ----
     private static final String[] I_COMBAT = {".......##", "......###", ".....###.", "....###..", "#..###...", ".####....", "..##.....", ".#.##....", "#...#...."};
@@ -41,7 +45,6 @@ public class ClickGuiScreen extends Screen {
     private static final String[] I_KEY = {".###...", "#...#..", "#...#..", ".###...", "..#....", "..##...", "..#...."};
     private static final String[] I_COLOR = {".#####.", "#.....#", "#.###.#", "#.###.#", "#.###.#", "#.....#", ".#####."};
     private static final String[] I_REFRESH = {".###.#.", "#...##.", "#....#.", "#......", "#.....#", ".#...#.", "..###.."};
-    private static final String[] I_SCRIPT = {".#####.", "#.....#", "#.#.#.#", "#..#..#", "#.#.#.#", "#.....#", ".#####."};
     private static final String[] I_K = {"###....###", "###...###.", "###..###..", "###.###...", "######....", "######....", "###.###...", "###..###..", "###...###.", "###....###"};
     private static final String[] I_PLUS = {"..#..", "..#..", "#####", "..#..", "..#.."};
     private static final String[] I_RESET = {".###.", "#...#", "#....", "#...#", ".###."};
@@ -158,14 +161,34 @@ public class ClickGuiScreen extends Screen {
     }
 
     private void layout(int oy) {
-        ww = Math.min(480, this.width - 20);
-        wh = Math.min(290, this.height - 20);
+        scl = Math.max(0.28f, Math.min(0.75f, Math.min((this.width - 24) / 1376f, (this.height - 20) / 868f)));
+        ww = Math.round(1376 * scl);
+        wh = Math.round(868 * scl);
         wx = (this.width - ww) / 2;
         wy = (this.height - wh) / 2 + oy;
-        bx = wx + SB + 8;
-        by = wy + HEAD + 8;
-        bw = ww - SB - 16 - 4;
-        bh = wh - HEAD - 16;
+
+        SB = u(325);
+        HEAD = u(135);
+        GAPC = u(14);
+        HEAD_H = u(41);
+        TAG_H = u(50);
+        PAD_TOP = u(8);
+        PAD_BOT = u(10);
+        LBL = Math.max(11, u(34));
+        FLD = Math.max(12, u(36));
+        CR = Math.max(10, u(28));
+        R_BOOL = Math.max(12, u(36));
+        R_MODE = LBL + FLD + u(11);
+        R_TEXT = R_MODE;
+        R_SLIDER = LBL + Math.max(8, u(12));
+        R_COLOR = LBL + 3 * CR + u(6);
+        R_SWATCH = LBL + Math.max(9, u(24)) + u(12);
+        R_BIND = Math.max(12, u(36));
+
+        bx = wx + SB + u(25);
+        by = wy + HEAD + u(18);
+        bw = ww - SB - u(25) - u(51);
+        bh = wh - HEAD - u(18);
     }
 
     private String keyText(Module m) {
@@ -181,9 +204,7 @@ public class ClickGuiScreen extends Screen {
         navList.add(new Nav("License", "Licencja", I_KEY, 1));
         if (Krux.DEV_BUILD) navList.add(new Nav("Developer", "Developer", I_MISC, 1));
         layout(0);
-        int btnX = wx + ww - 8 - 16;
-        int sbx = btnX - 6 - 124;
-        search = new EditBox(this.font, sbx + 18, wy + 5, 124 - 24, 16, Component.literal("Search"));
+        search = new EditBox(this.font, 0, 0, 100, 16, Component.literal("Search"));
         search.setBordered(false);
         search.setTextColor(TEXT);
         search.setHint(Component.literal("Szukaj modułów..."));
@@ -221,7 +242,7 @@ public class ClickGuiScreen extends Screen {
         return out;
     }
 
-    private static int settingHeight(Setting s) {
+    private int settingHeight(Setting s) {
         if (s instanceof Setting.Slider) return R_SLIDER;
         if (s instanceof Setting.Mode) return R_MODE;
         if (s instanceof Setting.ColorPick) return R_COLOR;
@@ -230,7 +251,7 @@ public class ClickGuiScreen extends Screen {
         return R_BOOL;
     }
 
-    private static int cardHeight(Module m) {
+    private int cardHeight(Module m) {
         int h = HEAD_H + (m.tags.length > 0 ? TAG_H : 0) + 1 + PAD_TOP;
         for (Setting s : m.settings) h += settingHeight(s);
         h += R_BIND + PAD_BOT;
@@ -278,102 +299,142 @@ public class ClickGuiScreen extends Screen {
         if (maxScroll > 0) {
             int thumbH = Math.max(14, Math.round(bh * (bh / (float) contentH)));
             int thumbY = by + Math.round((bh - thumbH) * (scroll / maxScroll));
-            rr(g, wx + ww - 6, thumbY, 2, thumbH, 1, TRACK);
+            rr(g, wx + ww - Math.max(5, u(18)), thumbY, 2, thumbH, 1, TRACK);
         }
 
         drawPopups(g, mx, my);
     }
 
+    private void iconS(GuiGraphics g, String[] rows, int x, int y, int col, int k) {
+        for (int r = 0; r < rows.length; r++) {
+            String row = rows[r];
+            for (int cc = 0; cc < row.length(); cc++) {
+                if (row.charAt(cc) == '#') fill(g, x + cc * k, y + r * k, x + (cc + 1) * k, y + (r + 1) * k, col);
+            }
+        }
+    }
+
     private void drawChrome(GuiGraphics g, int mx, int my) {
-        box(g, wx, wy, ww, wh, 6, WINBG, BORDER);
+        int rad = Math.max(4, u(26));
+        box(g, wx, wy, ww, wh, rad, WINBG, BORDER);
 
         // pasek boczny
-        rr(g, wx, wy, SB, wh, 6, SIDEBG);
-        fill(g, wx + 6, wy, wx + SB, wy + wh, SIDEBG);
+        rr(g, wx, wy, SB, wh, rad, SIDEBG);
+        fill(g, wx + rad, wy, wx + SB, wy + wh, SIDEBG);
         fill(g, wx + SB, wy, wx + SB + 1, wy + wh, BORDER);
         fill(g, wx, wy + HEAD, wx + SB, wy + HEAD + 1, BORDER);
         fill(g, wx + SB + 1, wy + HEAD, wx + ww, wy + HEAD + 1, BORDER);
 
-        // logo + nazwa
-        rr(g, wx + 8, wy + 4, 18, 18, 5, accent());
-        icon(g, I_K, wx + 8 + 4, wy + 4 + 4, 0xFFFFFFFF);
+        // logo + nazwa: "Krux" (powiększona, pogrubiona) + "Client" (jaśniejszy)
+        int ls = Math.max(14, u(44));
+        int lx = wx + u(30), ly = wy + (HEAD - ls) / 2;
+        rr(g, lx, ly, ls, ls, Math.max(3, u(12)), accent());
+        int ks = Math.max(1, ls / 15);
+        iconS(g, I_K, lx + (ls - 10 * ks) / 2, ly + (ls - 10 * ks) / 2, 0xFFFFFFFF, ks);
+
         Component krux = Component.literal("Krux").withStyle(ChatFormatting.BOLD);
-        g.drawString(this.font, krux, wx + 32, wy + 9, c(TEXT));
-        txt(g, "Client", wx + 32 + this.font.width(krux) + 4, wy + 9, MUT);
+        int tx = lx + ls + u(13);
+        int baseW = this.font.width(krux) + 4 + this.font.width("Client");
+        float bs = Math.max(1f, Math.min(2f, (wx + SB - u(14) - tx) / (float) baseW));
+        g.pose().pushMatrix();
+        g.pose().translate((float) tx, wy + HEAD / 2f - 4.5f * bs);
+        g.pose().scale(bs, bs);
+        g.drawString(this.font, krux, 0, 0, c(TEXT));
+        g.drawString(this.font, "Client", this.font.width(krux) + 4, 0, c(MUT));
+        g.pose().popMatrix();
 
         // pozycje paska bocznego
-        int y = wy + HEAD + 8;
+        int padX = u(26), itemH = Math.max(14, u(44)), gap = u(12);
+        int nx = wx + padX, nw = SB - 2 * padX;
+        int y = wy + HEAD + u(22);
         int lastSection = -1;
         for (int i = 0; i < navList.size(); i++) {
             Nav n = navList.get(i);
             if (n.section() != lastSection) {
                 lastSection = n.section();
-                if (i != 0) y += 6;
-                txt(g, n.section() == 0 ? "Główne" : "Inne", wx + 12, y, DIM);
-                y += 12;
+                int lh = Math.max(9, u(14));
+                txt(g, n.section() == 0 ? "Główne" : "Inne", wx + u(30), y + (lh - 8) / 2, DIM);
+                y += lh + (i == 0 ? u(10) : u(8));
             }
             boolean sel = i == cat && search.getValue().trim().isEmpty();
-            boolean hover = mx >= wx + 6 && mx < wx + SB - 6 && my >= y && my < y + 18;
+            boolean hover = mx >= nx && mx < nx + nw && my >= y && my < y + itemH;
+            int ir = Math.max(3, u(12));
             if (sel) {
-                box(g, wx + 6, y, SB - 12, 18, 4, SELBG, BORDER);
-                fill(g, wx + 7, y + 3, wx + 9, y + 15, accent());
+                box(g, nx, y, nw, itemH, ir, SELBG, BORDER);
+                fill(g, nx + 1, y + ir, nx + 1 + Math.max(2, u(3)), y + itemH - ir, accent());
+            } else if (hover) {
+                rr(g, nx, y, nw, itemH, ir, HOVBG);
             }
-            else if (hover) rr(g, wx + 6, y, SB - 12, 18, 4, HOVBG);
-            icon(g, n.icon(), wx + 13, y + 4, sel ? accent() : MUT);
-            txt(g, n.label(), wx + 27, y + 5, sel ? TEXT : MUT);
+            int ix = nx + u(17);
+            icon(g, n.icon(), ix, y + (itemH - 9) / 2, sel ? accent() : MUT);
+            txt(g, n.label(), ix + 9 + u(11), y + (itemH - 8) / 2, sel ? TEXT : MUT);
             if (sel) {
+                int gx = nx + nw - u(17) - 6, gy = y + (itemH - 10) / 2;
                 for (int dx = 0; dx < 2; dx++) for (int dy = 0; dy < 3; dy++) {
-                    fill(g, wx + SB - 6 - 11 + dx * 4, y + 4 + dy * 4, wx + SB - 6 - 11 + dx * 4 + 2, y + 4 + dy * 4 + 2, accent());
+                    fill(g, gx + dx * 4, gy + dy * 4, gx + dx * 4 + 2, gy + dy * 4 + 2, accent());
                 }
             }
-            hits.add(new Hit(Kind.NAV, wx + 6, y, SB - 12, 18, false, null, null, i));
-            y += 20;
+            hits.add(new Hit(Kind.NAV, nx, y, nw, itemH, false, null, null, i));
+            y += itemH + gap;
         }
 
         // stopka z nazwą gracza
-        int fy = wy + wh - 28;
+        int fh = Math.max(26, u(96));
+        int fy = wy + wh - fh;
         fill(g, wx, fy, wx + SB, fy + 1, BORDER);
-        rr(g, wx + 8, fy + 6, 16, 16, 4, 0xFF0B0B0D);
-        txt(g, "K", wx + 8 + 8 - this.font.width("K") / 2, fy + 10, accent());
+        int av = Math.max(14, u(40));
+        int ax = wx + u(30), ay = fy + (fh - av) / 2;
+        rr(g, ax, ay, av, av, Math.max(3, u(9)), 0xFF0A0D10);
+        int ks2 = Math.max(1, av / 22);
+        iconS(g, I_K, ax + (av - 10 * ks2) / 2, ay + (av - 10 * ks2) / 2, accent(), ks2);
+        int nameX = ax + av + u(13);
         String name = NameProtect.apply(Minecraft.getInstance().getUser().getName());
-        if (this.font.width(name) > SB - 52) name = this.font.plainSubstrByWidth(name, SB - 52);
-        txt(g, name, wx + 30, fy + 6, TEXT);
-        txt(g, Krux.DEV_BUILD ? "Developer" : "Customer", wx + 30, fy + 16, MUT);
+        int maxName = wx + SB - u(34) - nameX;
+        if (this.font.width(name) > maxName) name = this.font.plainSubstrByWidth(name, Math.max(10, maxName));
+        int ty2 = ay + (av - 18) / 2;
+        txt(g, name, nameX, ty2, TEXT);
+        txt(g, Krux.DEV_BUILD ? "Developer" : "Customer", nameX, ty2 + 10, MUT);
+        txtR(g, ">", wx + SB - u(26), ay + (av - 8) / 2, DIM);
 
         // nagłówek: ścieżka
-        int cx = wx + SB + 12;
+        int cx = wx + SB + u(28);
         String term = search.getValue().trim();
         if (term.isEmpty()) {
-            icon(g, navList.get(cat).icon(), cx, wy + 9, accent());
-            txt(g, navList.get(cat).label(), cx + 14, wy + 9, TEXT);
+            icon(g, navList.get(cat).icon(), cx, wy + (HEAD - 9) / 2, accent());
+            txt(g, navList.get(cat).label(), cx + 9 + u(8), wy + (HEAD - 8) / 2, TEXT);
         } else {
-            icon(g, I_SEARCH, cx, wy + 10, accent());
-            txt(g, "Wyniki wyszukiwania", cx + 14, wy + 9, TEXT);
+            icon(g, I_SEARCH, cx, wy + (HEAD - 7) / 2, accent());
+            txt(g, "Wyniki wyszukiwania", cx + 9 + u(8), wy + (HEAD - 8) / 2, TEXT);
         }
     }
 
     private void drawSearch(GuiGraphics g, int mx, int my, float pt) {
-        int btnX = wx + ww - 8 - 16;
-        int sbx = btnX - 6 - 124, sby = wy + 5;
+        int bsz = Math.max(14, u(44));
+        int btnX = wx + ww - u(40) - bsz;
+        int fw = Math.max(90, u(262));
+        int fx = btnX - u(14) - fw;
+        int fy = wy + (HEAD - bsz) / 2;
+        int r = Math.max(3, u(12));
         boolean focus = search.isFocused();
-        box(g, sbx, sby, 124, 16, 4, FIELD, focus ? accent() : BORDER);
-        icon(g, I_SEARCH, sbx + 6, sby + 4, MUT);
+        box(g, fx, fy, fw, bsz, r, FIELD, focus ? accent() : BORDER);
 
-        boolean rh = mx >= btnX && mx < btnX + 16 && my >= sby && my < sby + 16;
-        box(g, btnX, sby, 16, 16, 5, rh ? 0xFF2A2A31 : FIELD, BORDER);
-        icon(g, I_REFRESH, btnX + 4, sby + 4, TEXT);
-        hits.add(new Hit(Kind.REFRESH, btnX, sby, 16, 16, false, null, null, 0));
+        boolean rh = mx >= btnX && mx < btnX + bsz && my >= fy && my < fy + bsz;
+        box(g, btnX, fy, bsz, bsz, r, rh ? 0xFF262E37 : FIELD, BORDER);
+        icon(g, I_REFRESH, btnX + (bsz - 7) / 2, fy + (bsz - 7) / 2, TEXT);
+        hits.add(new Hit(Kind.REFRESH, btnX, fy, bsz, bsz, false, null, null, 0));
 
-        search.setX(sbx + 18);
-        search.setY(sby + (16 - 8) / 2 - 3);
+        search.setX(fx + u(14));
+        search.setY(fy + (bsz - 16) / 2);
+        search.setWidth(fw - 2 * u(14));
         search.render(g, mx, my, pt);
     }
 
     // ------------------------------------------------------------------ body (cards, masonry)
 
-    private void toggleSwitch(GuiGraphics g, int x, int y, float t) {
-        rr(g, x, y, 22, 12, 6, lerp(TRACK, accent(), t));
-        rr(g, x + 2 + Math.round(10 * t), y + 2, 8, 8, 4, 0xFFFFFFFF);
+    private void toggleSwitch(GuiGraphics g, int x, int y, int w, int h, float t) {
+        rr(g, x, y, w, h, h / 2, lerp(TRACK, accent(), t));
+        int pad = Math.max(2, h / 6), kh = h - 2 * pad;
+        rr(g, x + pad + Math.round((w - 2 * pad - kh) * t), y + pad, kh, kh, kh / 2, lerp(0xFF5A626B, 0xFFFFFFFF, t));
     }
 
     private int drawBody(GuiGraphics g, int mx, int my, int yOff) {
@@ -405,52 +466,59 @@ public class ClickGuiScreen extends Screen {
     }
 
     private void drawCard(GuiGraphics g, Module m, int x, int y, int cw, int ch, int mx, int my, boolean inView) {
+        int rad = Math.max(3, u(16));
         int tint = lerp(BORDER, accent(), 0.45f * m.onAnim);
-        box(g, x, y, cw, ch, 5, CARDBG, tint);
-        if (m.onAnim > 0.02f) fill(g, x, y + 2, x + 2, y + HEAD_H - 2, lerp(BORDER, accent(), m.onAnim));
+        box(g, x, y, cw, ch, rad, CARDBG, tint);
+        if (m.onAnim > 0.02f) {
+            fill(g, x, y + rad / 2, x + Math.max(2, u(3)), y + HEAD_H - rad / 2, lerp(BORDER, accent(), m.onAnim));
+        }
 
         // nagłówek karty
-        icon(g, iconFor(m.category), x + 7, y + 6, accent());
-        txt(g, m.name, x + 19 + 4 + 0, y + 6, TEXT);
-        int swX = x + cw - 7 - 22;
-        int starX = swX - 14;
+        int pl = u(15);
+        int tr = u(13) + u(28) / 2;                       // środek wiersza z tytułem
+        icon(g, iconFor(m.category), x + pl, y + tr - 4, accent());
+        txt(g, m.name, x + pl + 9 + u(7), y + tr - 4, TEXT);
+        int swW = Math.max(18, u(32)), swH = Math.max(10, u(19));
+        int swX = x + cw - pl - swW, swY = y + tr - swH / 2;
+        int starX = swX - u(12) - 9;
         boolean fav = StorageFinderConfig.favorites.contains(m.name);
-        icon(g, I_STAR, starX, y + 6, fav ? accent() : DIM);
-        toggleSwitch(g, swX, y + 4, m.onAnim);
-        hits.add(new Hit(Kind.HEAD, x, y, cw - 40, HEAD_H, true, m, null, 0));
-        hits.add(new Hit(Kind.STAR, starX - 2, y + 3, 13, 14, true, m, null, 0));
-        hits.add(new Hit(Kind.TOGGLE, swX, y + 4, 22, 12, true, m, null, 0));
+        icon(g, I_STAR, starX, y + tr - 4, fav ? accent() : DIM);
+        toggleSwitch(g, swX, swY, swW, swH, m.onAnim);
+        hits.add(new Hit(Kind.HEAD, x, y, Math.max(10, starX - x - 2), HEAD_H, true, m, null, 0));
+        hits.add(new Hit(Kind.STAR, starX - 2, y + tr - 8, 13, 16, true, m, null, 0));
+        hits.add(new Hit(Kind.TOGGLE, swX, swY, swW, swH, true, m, null, 0));
 
         int yy = y + HEAD_H;
         if (m.tags.length > 0) {
-            int tx = x + 7;
+            int chipH = Math.max(11, u(28)), tx = x + pl, ty0 = yy + u(7);
             for (String tag : m.tags) {
-                int w = this.font.width(tag) + 10;
-                rr(g, tx, yy + 1, w, 13, 4, TAGBG);
-                txt(g, tag, tx + 5, yy + 3, MUT);
-                tx += w + 4;
+                int w = this.font.width(tag) + 2 * Math.max(4, u(12));
+                rr(g, tx, ty0, w, chipH, Math.max(3, u(9)), TAGBG);
+                txt(g, tag, tx + (w - this.font.width(tag)) / 2, ty0 + (chipH - 8) / 2, MUT);
+                tx += w + u(8);
             }
             yy += TAG_H;
         }
         fill(g, x, yy, x + cw, yy + 1, BORDER);
         yy += 1 + PAD_TOP;
 
-        for (Setting s : m.settings) {
-            if (s instanceof Setting.Bool b) drawBool(g, m, b, x, yy, cw);
-            else if (s instanceof Setting.Slider sl) drawSlider(g, m, sl, x, yy, cw);
-            else if (s instanceof Setting.Mode md) drawMode(g, m, md, x, yy, cw);
-            else if (s instanceof Setting.Swatches sw) drawSwatches(g, m, sw, x, yy, cw);
-            else if (s instanceof Setting.ColorPick cp) drawColor(g, m, cp, x, yy, cw);
-            else if (s instanceof Setting.Text tx) drawText(g, m, tx, x, yy, cw);
-            yy += settingHeight(s);
+        for (Setting st : m.settings) {
+            if (st instanceof Setting.Bool b) drawBool(g, m, b, x, yy, cw);
+            else if (st instanceof Setting.Slider sl) drawSlider(g, m, sl, x, yy, cw);
+            else if (st instanceof Setting.Mode md) drawMode(g, m, md, x, yy, cw);
+            else if (st instanceof Setting.Swatches sw) drawSwatches(g, m, sw, x, yy, cw);
+            else if (st instanceof Setting.ColorPick cp) drawColor(g, m, cp, x, yy, cw);
+            else if (st instanceof Setting.Text tx) drawText(g, m, tx, x, yy, cw);
+            yy += settingHeight(st);
         }
 
         // Activation Key
-        icon(g, I_KEY, x + 8, yy + 4, accent());
-        txt(g, "Activation Key", x + 19 + 4, yy + 4, TEXT);
+        int lx = x + u(14);
+        icon(g, I_KEY, lx + 1, yy + (R_BIND - 7) / 2, accent());
+        txt(g, "Activation Key", lx + 9 + u(7), yy + (R_BIND - 8) / 2, TEXT);
         boolean wait = binding == m;
         String kt = wait ? "Naciśnij klawisz..." : keyText(m);
-        txtR(g, kt, x + cw - 7, yy + 4, wait ? accent() : MUT);
+        txtR(g, kt, x + cw - pl, yy + (R_BIND - 8) / 2, wait ? accent() : MUT);
         hits.add(new Hit(Kind.BIND, x, yy, cw, R_BIND, true, m, null, 0));
     }
 
@@ -467,97 +535,102 @@ public class ClickGuiScreen extends Screen {
     }
 
     private void drawText(GuiGraphics g, Module m, Setting.Text tx, int x, int y, int cw) {
-        icon(g, I_LIST, x + 8, y + 2, accent());
-        txt(g, tx.name, x + 19 + 4, y + 2, TEXT);
-        int fx = x + 7, fw = cw - 14, fy = y + 13;
+        int lx = x + u(14), pl = u(15);
+        icon(g, I_LIST, lx + 1, y + (LBL - 7) / 2, accent());
+        txt(g, tx.name, lx + 9 + u(7), y + (LBL - 8) / 2, TEXT);
+        int fx = x + pl, fw = cw - 2 * pl, fy = y + LBL;
         boolean active = editing == tx;
-        box(g, fx, fy, fw, 15, 4, FIELD, active ? accent() : BORDER);
+        box(g, fx, fy, fw, FLD, Math.max(3, u(11)), FIELD, active ? accent() : BORDER);
         if (active) {
-            textBox.setX(fx + 6);
-            textBox.setY(fy + 3);
-            textBox.setWidth(fw - 12);
-            textBox.render(this.dummyG(g), 0, 0, 0f);
+            textBox.setX(fx + u(13));
+            textBox.setY(fy + (FLD - 8) / 2 - 3);
+            textBox.setWidth(fw - 2 * u(13));
+            textBox.render(g, 0, 0, 0f);
             editX = fx;
             editY = fy;
             editW = fw;
         } else {
-            txt(g, tx.get(), fx + 6, fy + 4, 0xFFB4B4BE);
+            txt(g, tx.get(), fx + u(13), fy + (FLD - 8) / 2, 0xFFB4BCC4);
         }
-        hits.add(new Hit(Kind.TEXT, fx, fy, fw, 15, true, m, tx, 0));
+        hits.add(new Hit(Kind.TEXT, fx, fy, fw, FLD, true, m, tx, 0));
     }
 
-    private GuiGraphics dummyG(GuiGraphics g) { return g; }
-
     private void drawBool(GuiGraphics g, Module m, Setting.Bool b, int x, int y, int cw) {
-        icon(g, I_TOGGLE, x + 8, y + 5, accent());
-        int lx = x + 19 + 4;
+        int lx = x + u(14);
+        icon(g, I_TOGGLE, lx + 1, y + (R_BOOL - 5) / 2, accent());
+        int tx = lx + 9 + u(7);
         if (b.color != 0) {
-            rr(g, lx, y + 5, 6, 6, 2, b.color);
-            lx += 10;
+            rr(g, tx, y + (R_BOOL - 6) / 2, 6, 6, 2, b.color);
+            tx += 10;
         }
-        txt(g, b.name, lx, y + 4, TEXT);
-        toggleSwitch(g, x + cw - 7 - 22, y + 2, b.get() ? 1f : 0f);
+        txt(g, b.name, tx, y + (R_BOOL - 8) / 2, TEXT);
+        int swW = Math.max(18, u(32)), swH = Math.max(10, u(19));
+        toggleSwitch(g, x + cw - u(15) - swW, y + (R_BOOL - swH) / 2, swW, swH, b.get() ? 1f : 0f);
         hits.add(new Hit(Kind.BOOL, x, y, cw, R_BOOL, true, m, b, 0));
     }
 
-    private void track(GuiGraphics g, int x, int y, int w, double frac) {
-        rr(g, x, y, w, 3, 1, TRACK);
+    private void track(GuiGraphics g, int x, int y, int w, double frac, int fillCol) {
+        int th = Math.max(2, u(3));
+        rr(g, x, y, w, th, th / 2, TRACK);
         int fw = (int) Math.round(w * Math.max(0, Math.min(1, frac)));
-        if (fw > 0) rr(g, x, y, Math.max(2, fw), 3, 1, accent());
-        rr(g, x + fw - 3, y - 2, 7, 7, 3, 0xFFFFFFFF);
+        if (fw > 0) rr(g, x, y, Math.max(2, fw), th, th / 2, fillCol);
+        int ks = Math.max(5, u(9));
+        rr(g, x + fw - ks / 2, y + th / 2 - ks / 2, ks, ks, ks / 2, 0xFFE9EEF5);
     }
 
     private void drawSlider(GuiGraphics g, Module m, Setting.Slider sl, int x, int y, int cw) {
-        icon(g, I_SLIDER, x + 8, y + 2, accent());
-        txt(g, sl.name, x + 19 + 4, y + 2, TEXT);
-        txtR(g, sl.display(), x + cw - 7, y + 2, TEXT);
-        int tx = x + 8, tw = cw - 16;
-        track(g, tx, y + 15, tw, (sl.get() - sl.min) / (sl.max - sl.min));
-        hits.add(new Hit(Kind.SLIDER, tx, y + 11, tw, 11, true, m, sl, 0));
+        int lx = x + u(14), pl = u(15);
+        icon(g, I_SLIDER, lx + 1, y + (LBL - 5) / 2, accent());
+        txt(g, sl.name, lx + 9 + u(7), y + (LBL - 8) / 2, TEXT);
+        txtR(g, sl.display(), x + cw - pl, y + (LBL - 8) / 2, TEXT);
+        int tx = x + pl, tw = cw - 2 * pl, ty = y + LBL - 1;
+        track(g, tx, ty, tw, (sl.get() - sl.min) / (sl.max - sl.min), accent());
+        hits.add(new Hit(Kind.SLIDER, tx, ty - 5, tw, 12, true, m, sl, 0));
     }
 
     private void drawMode(GuiGraphics g, Module m, Setting.Mode md, int x, int y, int cw) {
-        icon(g, I_LIST, x + 8, y + 2, accent());
-        txt(g, md.name, x + 19 + 4, y + 2, TEXT);
-        int fx = x + 7, fw = cw - 14;
-        box(g, fx, y + 13, fw, 15, 4, FIELD, BORDER);
-        txt(g, md.options[md.get()], fx + 6, y + 17, 0xFFB4B4BE);
-        // strzałka
-        int ax = fx + fw - 12, ay = y + 19;
+        int lx = x + u(14), pl = u(15);
+        icon(g, I_LIST, lx + 1, y + (LBL - 7) / 2, accent());
+        txt(g, md.name, lx + 9 + u(7), y + (LBL - 8) / 2, TEXT);
+        int fx = x + pl, fw = cw - 2 * pl, fy = y + LBL;
+        box(g, fx, fy, fw, FLD, Math.max(3, u(11)), FIELD, BORDER);
+        txt(g, md.options[md.get()], fx + u(13), fy + (FLD - 8) / 2, 0xFFB4BCC4);
+        int ax = fx + fw - u(13) - 5, ay = fy + FLD / 2 - 1;
         fill(g, ax, ay, ax + 5, ay + 1, MUT);
         fill(g, ax + 1, ay + 1, ax + 4, ay + 2, MUT);
         fill(g, ax + 2, ay + 2, ax + 3, ay + 3, MUT);
-        hits.add(new Hit(Kind.DROPDOWN, fx, y + 13, fw, 15, true, m, md, 0));
+        hits.add(new Hit(Kind.DROPDOWN, fx, fy, fw, FLD, true, m, md, 0));
     }
 
     private void drawSwatches(GuiGraphics g, Module m, Setting.Swatches sw, int x, int y, int cw) {
-        icon(g, I_COLOR, x + 8, y + 2, accent());
-        txt(g, sw.name, x + 19 + 4, y + 2, TEXT);
+        int lx = x + u(14), pl = u(15);
+        icon(g, I_COLOR, lx + 1, y + (LBL - 7) / 2, accent());
+        txt(g, sw.name, lx + 9 + u(7), y + (LBL - 8) / 2, TEXT);
+        int sz = Math.max(9, u(24)), sy = y + LBL + u(2);
         int sel = sw.selected();
-        int cx = x + 8;
+        int cx = x + pl;
         for (int i = 0; i < sw.colors.length; i++) {
-            if (i == sel) rr(g, cx - 2, y + 11, 14, 14, 4, 0xFFFFFFFF);
-            rr(g, cx, y + 13, 10, 10, 3, 0xFF000000 | sw.colors[i]);
-            hits.add(new Hit(Kind.SWATCH, cx - 2, y + 11, 14, 14, true, m, sw, i));
-            cx += 16;
+            if (i == sel) rr(g, cx - 2, sy - 2, sz + 4, sz + 4, Math.max(3, u(8)), 0xFFFFFFFF);
+            rr(g, cx, sy, sz, sz, Math.max(2, u(7)), 0xFF000000 | sw.colors[i]);
+            hits.add(new Hit(Kind.SWATCH, cx - 2, sy - 2, sz + 4, sz + 4, true, m, sw, i));
+            cx += sz + u(8);
         }
     }
 
     private void drawColor(GuiGraphics g, Module m, Setting.ColorPick cp, int x, int y, int cw) {
         int rgb = cp.get();
-        icon(g, I_COLOR, x + 8, y + 2, accent());
-        txt(g, cp.name, x + 19 + 4, y + 2, TEXT);
-        rr(g, x + cw - 7 - 18, y + 1, 18, 9, 3, 0xFF000000 | rgb);
+        int lx = x + u(14), pl = u(15);
+        icon(g, I_COLOR, lx + 1, y + (LBL - 7) / 2, accent());
+        txt(g, cp.name, lx + 9 + u(7), y + (LBL - 8) / 2, TEXT);
+        int pw = Math.max(14, u(40)), ph = Math.max(8, u(20));
+        rr(g, x + cw - pl - pw, y + (LBL - ph) / 2, pw, ph, Math.max(2, u(7)), 0xFF000000 | rgb);
         int[] tint = {0xFFFF5555, 0xFF55FF55, 0xFF5577FF};
-        int tx = x + 8, tw = cw - 16;
-        for (int ch = 0; ch < 3; ch++) {
-            int ty = y + 16 + ch * 10;
-            int val = (rgb >> (16 - 8 * ch)) & 255;
-            rr(g, tx, ty, tw, 3, 1, TRACK);
-            int fw = (int) Math.round(tw * (val / 255.0));
-            if (fw > 0) rr(g, tx, ty, Math.max(2, fw), 3, 1, tint[ch]);
-            rr(g, tx + fw - 3, ty - 2, 7, 7, 3, 0xFFFFFFFF);
-            hits.add(new Hit(Kind.CHANNEL, tx, ty - 4, tw, 10, true, m, cp, ch));
+        int tx = x + pl, tw = cw - 2 * pl;
+        for (int chn = 0; chn < 3; chn++) {
+            int ty = y + LBL + chn * CR + CR / 2;
+            int val = (rgb >> (16 - 8 * chn)) & 255;
+            track(g, tx, ty, tw, val / 255.0, tint[chn]);
+            hits.add(new Hit(Kind.CHANNEL, tx, ty - 5, tw, 12, true, m, cp, chn));
         }
     }
 
@@ -674,7 +747,7 @@ public class ClickGuiScreen extends Screen {
         int btn = event.button();
 
         if (editing != null) {
-            boolean inField = mx >= editX && mx < editX + editW && my >= editY && my < editY + 15;
+            boolean inField = mx >= editX && mx < editX + editW && my >= editY && my < editY + FLD;
             if (inField) return super.mouseClicked(event, doubleClick);
             commitText();
         }
